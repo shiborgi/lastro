@@ -8,6 +8,13 @@
       "when": 1788321007975,
       "tag": "0000_busy_major_mapleleaf",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1788347269459,
+      "tag": "0001_strong_cassandra_nova",
+      "breakpoints": true
     }
   ]
 }

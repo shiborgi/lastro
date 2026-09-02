@@ -6,14 +6,17 @@
   "scripts": {
     "typecheck": "tsc --noEmit",
     "lint": "biome check .",
-    "test": "echo \"no unit tests in foundation yet\"",
+    "test": "bun test",
     "build": "mkdir -p dist && echo \"stub build for mcp\" > dist/index.js",
     "dev": "bun src/index.ts",
     "check": "bun run typecheck && bun run lint && bun run test && bun run build"
   },
   "dependencies": {
+    "@lastro/application": "workspace:*",
+    "@lastro/auth": "workspace:*",
     "@lastro/config": "workspace:*",
     "@lastro/db": "workspace:*",
+    "@lastro/domain": "workspace:*",
     "hono": "^4.6.12"
   },
   "devDependencies": {

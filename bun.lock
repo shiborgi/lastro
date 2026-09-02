@@ -7,6 +7,7 @@
       "devDependencies": {
         "@biomejs/biome": "^1.9.4",
         "@types/node": "^22.7.4",
+        "bun-types": "^1.2.0",
         "turbo": "^2.3.3",
         "typescript": "^5.6.3",
       },
@@ -15,8 +16,11 @@
       "name": "@lastro/api",
       "version": "0.0.0",
       "dependencies": {
+        "@lastro/application": "workspace:*",
+        "@lastro/auth": "workspace:*",
         "@lastro/config": "workspace:*",
         "@lastro/db": "workspace:*",
+        "@lastro/domain": "workspace:*",
         "hono": "^4.6.12",
       },
       "devDependencies": {
@@ -28,8 +32,11 @@
       "name": "@lastro/mcp",
       "version": "0.0.0",
       "dependencies": {
+        "@lastro/application": "workspace:*",
+        "@lastro/auth": "workspace:*",
         "@lastro/config": "workspace:*",
         "@lastro/db": "workspace:*",
+        "@lastro/domain": "workspace:*",
         "hono": "^4.6.12",
       },
       "devDependencies": {
@@ -56,6 +63,9 @@
     "packages/application": {
       "name": "@lastro/application",
       "version": "0.0.0",
+      "dependencies": {
+        "@lastro/domain": "workspace:*",
+      },
       "devDependencies": {
         "@types/node": "^22.7.4",
         "typescript": "^5.6.3",
@@ -64,6 +74,9 @@
     "packages/auth": {
       "name": "@lastro/auth",
       "version": "0.0.0",
+      "dependencies": {
+        "@lastro/domain": "workspace:*",
+      },
       "devDependencies": {
         "@types/node": "^22.7.4",
         "typescript": "^5.6.3",
@@ -103,6 +116,7 @@
       "name": "@lastro/db",
       "version": "0.0.0",
       "dependencies": {
+        "@lastro/domain": "workspace:*",
         "drizzle-orm": "^0.33.0",
         "postgres": "^3.4.4",
       },
@@ -132,6 +146,8 @@
       "name": "@lastro/testing",
       "version": "0.0.0",
       "dependencies": {
+        "@lastro/application": "workspace:*",
+        "@lastro/auth": "workspace:*",
         "@lastro/db": "workspace:*",
       },
       "devDependencies": {
@@ -262,6 +278,8 @@
     "@types/node": ["@types/node@22.20.1", "", { "dependencies": { "undici-types": "~6.21.0" } }, "sha512-EANqOCF9QFyra+4pfxUcX9STKJpCLjMbObVzljIJomAWSnuSIEAvyzEU53GaajbXJEgdh0iEcPL+DGvpUd4k1Q=="],
 
     "buffer-from": ["buffer-from@1.1.2", "", {}, "sha512-E+XQCRwSbaaiChtv6k6Dwgc+bx+Bs6vuKJHHl5kox/BaKbhiXzqQOwK4cO22yElGp2OCmjwVhT3HmxgyPGnJfQ=="],
+
+    "bun-types": ["bun-types@1.4.0", "", { "dependencies": { "@types/node": "*" } }, "sha512-iIKw23BspnQQYd3prITOBxeUsxBHnwzX6YJfGMuNOZzeNcMmVqzIIVGRm1l69ogaPQmb4wB6BN8mA5bE9YuC5Q=="],
 
     "debug": ["debug@4.4.3", "", { "dependencies": { "ms": "^2.1.3" }, "peerDependencies": { "supports-color": "*" }, "optionalPeers": ["supports-color"] }, "sha512-RGwwWnwQvkVfavKVt22FGLw+xYSdzARwm0ru6DhTVA3umU5hZc28V3kO4stgYryrTlLpuvgI9GiijltAjNbcqA=="],
 

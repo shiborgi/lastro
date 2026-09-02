@@ -17,6 +17,8 @@
     "check": "bun run typecheck && bun run lint && bun run test && bun run build"
   },
   "dependencies": {
+    "@lastro/application": "workspace:*",
+    "@lastro/auth": "workspace:*",
     "@lastro/db": "workspace:*"
   },
   "devDependencies": {

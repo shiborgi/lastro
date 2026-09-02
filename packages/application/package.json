@@ -11,12 +11,15 @@
   "scripts": {
     "typecheck": "tsc --noEmit",
     "lint": "biome check .",
-    "test": "echo \"no unit tests in foundation yet\"",
+    "test": "bun test",
     "build": "mkdir -p dist && echo \"stub build for application\" > dist/index.js",
     "check": "bun run typecheck && bun run lint && bun run test && bun run build"
   },
   "devDependencies": {
     "typescript": "^5.6.3",
     "@types/node": "^22.7.4"
+  },
+  "dependencies": {
+    "@lastro/domain": "workspace:*"
   }
 }

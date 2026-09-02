@@ -12,8 +12,11 @@
     "check": "bun run typecheck && bun run lint && bun run test && bun run build"
   },
   "dependencies": {
+    "@lastro/application": "workspace:*",
+    "@lastro/auth": "workspace:*",
     "@lastro/config": "workspace:*",
     "@lastro/db": "workspace:*",
+    "@lastro/domain": "workspace:*",
     "hono": "^4.6.12"
   },
   "devDependencies": {

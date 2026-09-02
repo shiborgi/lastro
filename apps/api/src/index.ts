@@ -1,9 +1,17 @@
+import { createApplication } from "@lastro/application";
+import { createAuthService } from "@lastro/auth";
 import { parseEnv } from "@lastro/config";
-import { pingDatabase } from "@lastro/db";
+import { createDb, createRepositories, pingDatabase } from "@lastro/db";
 import { createApi } from "./app";
 
 const env = parseEnv();
-const app = createApi({ ping: () => pingDatabase(env.DATABASE_URL) });
+const db = createDb(env.DATABASE_URL);
+const repositories = createRepositories(db);
+const app = createApi({
+  ping: () => pingDatabase(env.DATABASE_URL),
+  application: createApplication(repositories),
+  auth: createAuthService(repositories.auth),
+});
 const port = Number(process.env.PORT ?? "3001");
 
 export const server = Bun.serve({
