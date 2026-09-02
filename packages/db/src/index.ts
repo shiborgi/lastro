@@ -9,7 +9,7 @@ import {
   type Role,
   roles,
 } from "@lastro/domain";
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import * as schema from "./schema";
@@ -85,6 +85,11 @@ function expenseFromRow(row: typeof schema.expenses.$inferSelect): Expense {
     accountId: String(row.accountId),
     partyId: String(row.partyId),
     expenseCategoryId: String(row.expenseCategoryId),
+    amountMinor: row.amountMinor,
+    currency: row.currency,
+    installmentNumber: row.installmentNumber,
+    installmentCount: row.installmentCount,
+    occurredAt: row.occurredAt,
     createdAt: row.createdAt,
   };
 }
@@ -338,6 +343,11 @@ export function createRepositories(db: Database) {
             accountId: Number(input.accountId),
             partyId: Number(input.partyId),
             expenseCategoryId: Number(input.expenseCategoryId),
+            amountMinor: input.amountMinor,
+            currency: input.currency,
+            installmentNumber: input.installmentNumber,
+            installmentCount: input.installmentCount,
+            occurredAt: input.occurredAt,
           })
           .returning();
         await tx
@@ -353,6 +363,193 @@ export function createRepositories(db: Database) {
         .from(schema.expenses)
         .where(eq(schema.expenses.bookId, bookNumber(bookId)));
       return rows.map(expenseFromRow);
+    },
+
+    async createPayment(
+      input: {
+        bookId: string;
+        accountId: string;
+        partyId?: string | null;
+        amountMinor: bigint;
+        currency: string;
+        occurredAt?: Date;
+        idempotencyKey?: string;
+      },
+      audit: AuditEvent,
+    ) {
+      return db.transaction(async (tx) => {
+        const bookId = bookNumber(input.bookId);
+        if (input.idempotencyKey) {
+          await tx.execute(
+            sql`select pg_advisory_xact_lock(hashtext(${`${bookId}:${input.idempotencyKey}`}))`,
+          );
+          const [existing] = await tx
+            .select()
+            .from(schema.idempotencyRecords)
+            .where(
+              and(
+                eq(schema.idempotencyRecords.bookId, bookId),
+                eq(schema.idempotencyRecords.key, input.idempotencyKey),
+              ),
+            );
+          if (existing) {
+            if (existing.operation !== "payment.create") {
+              throw new Error(
+                "idempotency key was already used for another operation",
+              );
+            }
+            const [payment] = await tx
+              .select()
+              .from(schema.payments)
+              .where(
+                and(
+                  eq(schema.payments.bookId, bookId),
+                  eq(schema.payments.id, Number(existing.resourceId)),
+                ),
+              );
+            if (!payment)
+              throw new Error("idempotency record references no payment");
+            return payment;
+          }
+        }
+        const [payment] = await tx
+          .insert(schema.payments)
+          .values({
+            bookId,
+            accountId: Number(input.accountId),
+            partyId: input.partyId == null ? null : Number(input.partyId),
+            amountMinor: input.amountMinor,
+            currency: input.currency,
+            occurredAt: input.occurredAt,
+          })
+          .returning();
+        await tx
+          .insert(schema.auditEvents)
+          .values(auditValues(audit, String(payment.id)));
+        if (input.idempotencyKey) {
+          await tx.insert(schema.idempotencyRecords).values({
+            bookId,
+            key: input.idempotencyKey,
+            operation: "payment.create",
+            resourceType: "payment",
+            resourceId: String(payment.id),
+          });
+        }
+        return payment;
+      });
+    },
+
+    async createExpenseSettlement(
+      input: {
+        bookId: string;
+        expenseId: string;
+        paymentId: string;
+        amountMinor: bigint;
+        currency: string;
+        idempotencyKey?: string;
+      },
+      audit: AuditEvent,
+    ) {
+      return db.transaction(async (tx) => {
+        const bookId = bookNumber(input.bookId);
+        // Serialize allocations affecting either balance before constraint checks run.
+        await tx.execute(
+          sql`select pg_advisory_xact_lock(hashtext(${`expense:${bookId}:${input.expenseId}`}))`,
+        );
+        await tx.execute(
+          sql`select pg_advisory_xact_lock(hashtext(${`payment:${bookId}:${input.paymentId}`}))`,
+        );
+        if (input.idempotencyKey) {
+          await tx.execute(
+            sql`select pg_advisory_xact_lock(hashtext(${`${bookId}:${input.idempotencyKey}`}))`,
+          );
+          const [existing] = await tx
+            .select()
+            .from(schema.idempotencyRecords)
+            .where(
+              and(
+                eq(schema.idempotencyRecords.bookId, bookId),
+                eq(schema.idempotencyRecords.key, input.idempotencyKey),
+              ),
+            );
+          if (existing) {
+            if (existing.operation !== "expense_settlement.create") {
+              throw new Error(
+                "idempotency key was already used for another operation",
+              );
+            }
+            const [settlement] = await tx
+              .select()
+              .from(schema.expenseSettlements)
+              .where(
+                and(
+                  eq(schema.expenseSettlements.bookId, bookId),
+                  eq(schema.expenseSettlements.id, Number(existing.resourceId)),
+                ),
+              );
+            if (!settlement) {
+              throw new Error("idempotency record references no settlement");
+            }
+            return settlement;
+          }
+        }
+        const [settlement] = await tx
+          .insert(schema.expenseSettlements)
+          .values({
+            bookId,
+            expenseId: Number(input.expenseId),
+            paymentId: Number(input.paymentId),
+            amountMinor: input.amountMinor,
+            currency: input.currency,
+          })
+          .returning();
+        await tx
+          .insert(schema.auditEvents)
+          .values(auditValues(audit, String(settlement.id)));
+        if (input.idempotencyKey) {
+          await tx.insert(schema.idempotencyRecords).values({
+            bookId,
+            key: input.idempotencyKey,
+            operation: "expense_settlement.create",
+            resourceType: "expense_settlement",
+            resourceId: String(settlement.id),
+          });
+        }
+        return settlement;
+      });
+    },
+
+    async voidExpenseSettlement(
+      input: {
+        bookId: string;
+        id: string;
+        voidedBy: string;
+        voidReason?: string;
+      },
+      audit: AuditEvent,
+    ) {
+      return db.transaction(async (tx) => {
+        const [settlement] = await tx
+          .update(schema.expenseSettlements)
+          .set({
+            voidedAt: new Date(),
+            voidedBy: input.voidedBy,
+            voidReason: input.voidReason,
+          })
+          .where(
+            and(
+              eq(schema.expenseSettlements.bookId, bookNumber(input.bookId)),
+              eq(schema.expenseSettlements.id, Number(input.id)),
+              sql`${schema.expenseSettlements.voidedAt} is null`,
+            ),
+          )
+          .returning();
+        if (!settlement) throw new Error("active settlement was not found");
+        await tx
+          .insert(schema.auditEvents)
+          .values(auditValues(audit, String(settlement.id)));
+        return settlement;
+      });
     },
 
     async listAuditEvents(correlationId: string) {

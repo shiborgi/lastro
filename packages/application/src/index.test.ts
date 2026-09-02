@@ -26,6 +26,62 @@ function fakeRepository() {
   };
 }
 
+function financialRepository() {
+  const calls: Array<{
+    bookId: string;
+    accountId: string;
+    partyId?: string | null;
+    amountMinor: bigint;
+    currency: string;
+    occurredAt?: Date;
+    idempotencyKey?: string;
+  }> = [];
+  return {
+    calls,
+    createPayment: async (input: {
+      bookId: string;
+      accountId: string;
+      partyId?: string | null;
+      amountMinor: bigint;
+      currency: string;
+      idempotencyKey?: string;
+    }) => {
+      calls.push(input);
+      return { id: "payment-1", ...input };
+    },
+    getExpense: async (bookId: string, id: string) => ({
+      id,
+      bookId,
+      name: "Supplies",
+      type: "EXPENSE",
+      accountId: "account-1",
+      partyId: "party-1",
+      expenseCategoryId: "category-1",
+      amountMinor: 100n,
+      currency: "USD",
+    }),
+    listExpenseSettlements: async () => [
+      {
+        id: "settlement-1",
+        bookId: "1",
+        expenseId: "expense-1",
+        paymentId: "payment-1",
+        amountMinor: 40n,
+        currency: "USD",
+      },
+      {
+        id: "settlement-2",
+        bookId: "1",
+        expenseId: "expense-1",
+        paymentId: "payment-2",
+        amountMinor: 20n,
+        currency: "USD",
+        voidedAt: new Date(),
+      },
+    ],
+  };
+}
+
 describe("financial application commands", () => {
   test("validate context before repository mutation", async () => {
     const repository = fakeRepository();
@@ -64,5 +120,68 @@ describe("financial application commands", () => {
       }),
     ).rejects.toThrow("FORBIDDEN");
     expect(repository.mutations).toBe(0);
+  });
+
+  test("scopes payments and their idempotency keys to the execution Book", async () => {
+    const repository = financialRepository();
+    const application = createApplication(repository);
+
+    await application.createPayment({
+      context: { ...baseContext, bookId: "2", idempotencyKey: "payment-key" },
+      accountId: "account-1",
+      amountMinor: 100n,
+      currency: "USD",
+    });
+
+    expect(repository.calls).toEqual([
+      {
+        bookId: "2",
+        accountId: "account-1",
+        amountMinor: 100n,
+        currency: "USD",
+        idempotencyKey: "payment-key",
+        partyId: undefined,
+        occurredAt: undefined,
+      },
+    ]);
+  });
+
+  test("calculates status and balance without voided settlements", async () => {
+    const application = createApplication(financialRepository());
+    const input = { context: baseContext, id: "expense-1" };
+
+    expect(await application.getExpenseBalance(input)).toEqual({
+      minor: 60n,
+      currency: "USD",
+    });
+    expect(await application.getExpenseStatus(input)).toBe("PARTIALLY_SETTLED");
+  });
+
+  test("persists monetary installment details when creating an expense", async () => {
+    let created: Record<string, unknown> | undefined;
+    const application = createApplication({
+      createExpense: async (input) => {
+        created = input;
+        return { id: "expense-1", ...input };
+      },
+    });
+
+    await application.createExpense({
+      context: baseContext,
+      accountId: "account-1",
+      partyId: "party-1",
+      expenseCategoryId: "category-1",
+      amountMinor: 300n,
+      currency: "USD",
+      installmentNumber: 1,
+      installmentCount: 3,
+    });
+
+    expect(created).toMatchObject({
+      amountMinor: 300n,
+      currency: "USD",
+      installmentNumber: 1,
+      installmentCount: 3,
+    });
   });
 });

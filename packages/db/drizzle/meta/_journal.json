@@ -15,6 +15,13 @@
       "when": 1788347269459,
       "tag": "0001_strong_cassandra_nova",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1788430000000,
+      "tag": "0002_wave_13_expense_payments",
+      "breakpoints": true
     }
   ]
 }

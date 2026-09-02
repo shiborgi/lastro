@@ -64,7 +64,12 @@ try {
   console.log("PostgreSQL and service health endpoints reported database up.");
 
   const invariants = Bun.spawn(
-    ["bun", "test", "packages/testing/src/wave12.integration.ts"],
+    [
+      "bun",
+      "test",
+      "./packages/testing/src/wave12.integration.ts",
+      "./packages/testing/src/wave13.integration.ts",
+    ],
     {
       cwd: REPO_ROOT,
       env: { ...process.env, DATABASE_URL },
@@ -73,7 +78,7 @@ try {
     },
   );
   if ((await invariants.exited) !== 0) {
-    throw new Error("WAVE-1.2 PostgreSQL invariant tests failed");
+    throw new Error("WAVE-1.2/WAVE-1.3 PostgreSQL invariant tests failed");
   }
 } finally {
   for (const child of children) {

@@ -5,12 +5,67 @@ import {
   ConflictError,
   type Expense,
   type ExpenseCategory,
+  type FinancialStatus,
+  type Money,
   type Party,
   type RevenueCategory,
   assertAuthorized,
   assertExecutionContext,
+  availableBalance,
+  financialStatus,
+  installment,
+  money,
   operations,
 } from "@lastro/domain";
+
+export type Payment = {
+  id: string | number;
+  bookId: string | number;
+  accountId: string | number;
+  partyId?: string | number | null;
+  amountMinor: bigint;
+  currency: string;
+  occurredAt?: Date;
+  createdAt?: Date;
+};
+
+export type ExpenseSettlement = {
+  id: string | number;
+  bookId: string | number;
+  expenseId: string | number;
+  paymentId: string | number;
+  amountMinor: bigint;
+  currency: string;
+  voidedAt?: Date | null;
+  voidedBy?: string | null;
+  voidReason?: string | null;
+  createdAt?: Date;
+};
+
+export type FinancialExpense = Expense & {
+  amountMinor: bigint;
+  currency: string;
+  occurredAt?: Date;
+};
+
+type CreatePaymentRepositoryInput = {
+  bookId: string;
+  accountId: string;
+  partyId?: string | null;
+  amountMinor: bigint;
+  currency: string;
+  occurredAt?: Date;
+  idempotencyKey?: string;
+};
+
+type CreateExpenseSettlementRepositoryInput = {
+  bookId: string;
+  expenseId: string;
+  paymentId: string;
+  amountMinor: bigint;
+  currency: string;
+  idempotencyKey?: string;
+};
 
 export type ApplicationRepository = {
   listBooks?: (actorId: string, bookId?: string) => Promise<Book[]>;
@@ -51,6 +106,30 @@ export type ApplicationRepository = {
     audit: AuditEvent,
   ) => Promise<Expense>;
   listExpenses?: (bookId: string) => Promise<Expense[]>;
+  createPayment?: (
+    input: CreatePaymentRepositoryInput,
+    audit: AuditEvent,
+  ) => Promise<Payment>;
+  listPayments?: (bookId: string) => Promise<Payment[]>;
+  createExpenseSettlement?: (
+    input: CreateExpenseSettlementRepositoryInput,
+    audit: AuditEvent,
+  ) => Promise<ExpenseSettlement>;
+  voidExpenseSettlement?: (
+    input: {
+      bookId: string;
+      id: string;
+      voidedBy: string;
+      voidReason?: string;
+    },
+    audit: AuditEvent,
+  ) => Promise<ExpenseSettlement>;
+  getExpense?: (bookId: string, id: string) => Promise<FinancialExpense | null>;
+  listExpenseSettlements?: (
+    bookId: string,
+    expenseId: string,
+  ) => Promise<ExpenseSettlement[]>;
+  listPendingExpenses?: (bookId: string) => Promise<FinancialExpense[]>;
 };
 
 export type CommandContext = { context: unknown };
@@ -71,13 +150,57 @@ export type CreateExpenseCommand = CommandContext & {
   accountId: string;
   partyId: string;
   expenseCategoryId: string;
+  amountMinor?: bigint;
+  currency?: string;
+  installmentNumber?: number;
+  installmentCount?: number;
+  occurredAt?: Date;
 };
 
 export type DeleteCommand = CommandContext & { id: string };
 
+export type CreatePaymentCommand = CommandContext & {
+  accountId: string;
+  partyId?: string | null;
+  amountMinor: bigint;
+  currency: string;
+  occurredAt?: Date;
+};
+
+export type CreateExpenseSettlementCommand = CommandContext & {
+  expenseId: string;
+  paymentId: string;
+  amountMinor: bigint;
+  currency: string;
+};
+
+export type VoidExpenseSettlementCommand = CommandContext & {
+  id: string;
+  voidReason?: string;
+};
+
+export type ExpenseQuery = CommandContext & { id: string };
+
 function requireText(value: string, field: string): string {
   if (!value.trim()) throw new Error(`${field} is required`);
   return value;
+}
+
+function requirePositiveMoney(amountMinor: bigint, currency: string): Money {
+  if (typeof amountMinor !== "bigint" || amountMinor <= 0n) {
+    throw new Error("amountMinor must be positive");
+  }
+  if (!/^[A-Z]{3}$/.test(currency)) {
+    throw new Error("currency must be a three-letter uppercase code");
+  }
+  const result = money(amountMinor, currency);
+  if (!result.ok) throw result.error;
+  return result.value;
+}
+
+function requireExpense(expense: FinancialExpense | null): FinancialExpense {
+  if (!expense) throw new Error("expense was not found");
+  return expense;
 }
 
 function auditFor(
@@ -272,12 +395,30 @@ export function createApplication(repository: ApplicationRepository) {
       requireText(input.accountId, "accountId");
       requireText(input.partyId, "partyId");
       requireText(input.expenseCategoryId, "expenseCategoryId");
+      if (input.amountMinor !== undefined || input.currency !== undefined) {
+        requirePositiveMoney(input.amountMinor ?? 0n, input.currency ?? "");
+      }
+      if (
+        input.installmentNumber !== undefined ||
+        input.installmentCount !== undefined
+      ) {
+        const result = installment(
+          input.installmentNumber ?? 0,
+          input.installmentCount ?? 0,
+        );
+        if (!result.ok) throw result.error;
+      }
       return method(repository, "createExpense")(
         {
           bookId: context.bookId,
           accountId: input.accountId,
           partyId: input.partyId,
           expenseCategoryId: input.expenseCategoryId,
+          amountMinor: input.amountMinor,
+          currency: input.currency,
+          installmentNumber: input.installmentNumber,
+          installmentCount: input.installmentCount,
+          occurredAt: input.occurredAt,
         },
         auditFor(context, "expense.created", "expense", {
           accountId: input.accountId,
@@ -291,6 +432,156 @@ export function createApplication(repository: ApplicationRepository) {
       const context = contextFor(contextInput);
       assertAuthorized(context, operations.listExpenses);
       return method(repository, "listExpenses")(context.bookId);
+    },
+
+    async createPayment(input: CreatePaymentCommand): Promise<Payment> {
+      const context = contextFor(input.context);
+      assertAuthorized(context, operations.createExpense);
+      requireText(input.accountId, "accountId");
+      if (input.partyId != null) requireText(input.partyId, "partyId");
+      requirePositiveMoney(input.amountMinor, input.currency);
+      return method(repository, "createPayment")(
+        {
+          bookId: context.bookId,
+          accountId: input.accountId,
+          partyId: input.partyId,
+          amountMinor: input.amountMinor,
+          currency: input.currency,
+          occurredAt: input.occurredAt,
+          idempotencyKey: context.idempotencyKey,
+        },
+        auditFor(context, "payment.created", "payment", {
+          accountId: input.accountId,
+          partyId: input.partyId,
+          amountMinor: input.amountMinor,
+          currency: input.currency,
+        }),
+      );
+    },
+
+    async listPayments(contextInput: unknown): Promise<Payment[]> {
+      const context = contextFor(contextInput);
+      assertAuthorized(context, operations.listExpenses);
+      return method(repository, "listPayments")(context.bookId);
+    },
+
+    async createExpenseSettlement(
+      input: CreateExpenseSettlementCommand,
+    ): Promise<ExpenseSettlement> {
+      const context = contextFor(input.context);
+      assertAuthorized(context, operations.createExpense);
+      requireText(input.expenseId, "expenseId");
+      requireText(input.paymentId, "paymentId");
+      requirePositiveMoney(input.amountMinor, input.currency);
+      return method(repository, "createExpenseSettlement")(
+        {
+          bookId: context.bookId,
+          expenseId: input.expenseId,
+          paymentId: input.paymentId,
+          amountMinor: input.amountMinor,
+          currency: input.currency,
+          idempotencyKey: context.idempotencyKey,
+        },
+        auditFor(context, "expense_settlement.created", "expense_settlement", {
+          expenseId: input.expenseId,
+          paymentId: input.paymentId,
+          amountMinor: input.amountMinor,
+          currency: input.currency,
+        }),
+      );
+    },
+
+    async voidExpenseSettlement(
+      input: VoidExpenseSettlementCommand,
+    ): Promise<ExpenseSettlement> {
+      const context = contextFor(input.context);
+      assertAuthorized(context, operations.createExpense);
+      requireText(input.id, "id");
+      if (input.voidReason != null) requireText(input.voidReason, "voidReason");
+      return method(repository, "voidExpenseSettlement")(
+        {
+          bookId: context.bookId,
+          id: input.id,
+          voidedBy: context.agentPrincipal ?? context.actorId,
+          voidReason: input.voidReason,
+        },
+        auditFor(context, "expense_settlement.voided", "expense_settlement", {
+          id: input.id,
+          voidReason: input.voidReason,
+        }),
+      );
+    },
+
+    async getExpenseBalance(input: ExpenseQuery): Promise<Money> {
+      const context = contextFor(input.context);
+      assertAuthorized(context, operations.listExpenses);
+      requireText(input.id, "id");
+      const expense = requireExpense(
+        await method(repository, "getExpense")(context.bookId, input.id),
+      );
+      const total = requirePositiveMoney(expense.amountMinor, expense.currency);
+      const settlements = await method(repository, "listExpenseSettlements")(
+        context.bookId,
+        input.id,
+      );
+      const result = availableBalance(
+        total,
+        settlements.map((settlement) => ({
+          amount: {
+            minor: settlement.amountMinor,
+            currency: settlement.currency,
+          },
+          voidedAt: settlement.voidedAt,
+        })),
+      );
+      if (!result.ok) throw result.error;
+      return result.value;
+    },
+
+    async getExpenseStatus(input: ExpenseQuery): Promise<FinancialStatus> {
+      const context = contextFor(input.context);
+      assertAuthorized(context, operations.listExpenses);
+      requireText(input.id, "id");
+      const expense = requireExpense(
+        await method(repository, "getExpense")(context.bookId, input.id),
+      );
+      const total = requirePositiveMoney(expense.amountMinor, expense.currency);
+      const settlements = await method(repository, "listExpenseSettlements")(
+        context.bookId,
+        input.id,
+      );
+      const result = financialStatus(
+        total,
+        settlements.map((settlement) => ({
+          amount: {
+            minor: settlement.amountMinor,
+            currency: settlement.currency,
+          },
+          voidedAt: settlement.voidedAt,
+        })),
+      );
+      if (!result.ok) throw result.error;
+      return result.value;
+    },
+
+    async listExpenseSettlementHistory(
+      input: ExpenseQuery,
+    ): Promise<ExpenseSettlement[]> {
+      const context = contextFor(input.context);
+      assertAuthorized(context, operations.listExpenses);
+      requireText(input.id, "id");
+      return method(repository, "listExpenseSettlements")(
+        context.bookId,
+        input.id,
+      );
+    },
+
+    async listPendingExpenses(
+      contextInput: unknown,
+    ): Promise<FinancialExpense[]> {
+      const context = contextFor(contextInput);
+      assertAuthorized(context, operations.listExpenses);
+      return method(repository, "listPendingExpenses")(context.bookId);
     },
   };
 }
@@ -308,5 +599,30 @@ export function createExpenseCommand(repository: ApplicationRepository) {
   return {
     execute: (input: CreateExpenseCommand) =>
       createApplication(repository).createExpense(input),
+  };
+}
+
+export function createPaymentCommand(repository: ApplicationRepository) {
+  return {
+    execute: (input: CreatePaymentCommand) =>
+      createApplication(repository).createPayment(input),
+  };
+}
+
+export function createExpenseSettlementCommand(
+  repository: ApplicationRepository,
+) {
+  return {
+    execute: (input: CreateExpenseSettlementCommand) =>
+      createApplication(repository).createExpenseSettlement(input),
+  };
+}
+
+export function voidExpenseSettlementCommand(
+  repository: ApplicationRepository,
+) {
+  return {
+    execute: (input: VoidExpenseSettlementCommand) =>
+      createApplication(repository).voidExpenseSettlement(input),
   };
 }

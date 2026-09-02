@@ -2,10 +2,21 @@
 import { describe, expect, test } from "bun:test";
 import {
   ForbiddenError,
+  type Result,
+  addMoney,
   assertAuthorized,
   assertExecutionContext,
+  availableBalance,
+  financialStatus,
+  installment,
+  money,
   operations,
 } from "./index";
+
+function resultValue<T>(result: Result<T>): T {
+  if (!result.ok) throw result.error;
+  return result.value;
+}
 
 const context = {
   actorId: "user-1",
@@ -27,6 +38,54 @@ describe("execution context", () => {
       const input = { ...context, [field]: "" };
       expect(() => assertExecutionContext(input)).toThrow(new RegExp(field));
     }
+  });
+});
+
+describe("expense cycle domain", () => {
+  test("keeps Money immutable and rejects invalid and mismatched values", () => {
+    const usd = money(100n, "USD");
+    const brl = money(100n, "BRL");
+    expect(usd.ok && brl.ok).toBe(true);
+    if (!usd.ok || !brl.ok) return;
+    expect(addMoney(usd.value, brl.value).ok).toBe(false);
+    expect(money(-1n, "USD").ok).toBe(false);
+    expect(usd.value).toEqual({ minor: 100n, currency: "USD" });
+  });
+
+  test("derives balances and statuses from active settlements", () => {
+    const total = money(100n, "USD");
+    const partial = money(40n, "USD");
+    const full = money(60n, "USD");
+    if (!total.ok || !partial.ok || !full.ok) return;
+    expect(resultValue(financialStatus(total.value, []))).toBe("OPEN");
+    expect(
+      resultValue(financialStatus(total.value, [{ amount: partial.value }])),
+    ).toBe("PARTIALLY_SETTLED");
+    expect(
+      resultValue(
+        financialStatus(total.value, [
+          { amount: partial.value },
+          { amount: full.value },
+        ]),
+      ),
+    ).toBe("SETTLED");
+    expect(
+      resultValue(availableBalance(total.value, [{ amount: partial.value }])),
+    ).toEqual({ minor: 60n, currency: "USD" });
+    expect(
+      resultValue(
+        financialStatus(total.value, [
+          { amount: total.value, voidedAt: new Date() },
+        ]),
+      ),
+    ).toBe("OPEN");
+  });
+
+  test("validates installment bounds", () => {
+    expect(installment(1, 3).ok).toBe(true);
+    expect(installment(0, 3).ok).toBe(false);
+    expect(installment(1, 0).ok).toBe(false);
+    expect(installment(4, 3).ok).toBe(false);
   });
 });
 

@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 import {
+  bigint,
   check,
   foreignKey,
   integer,
@@ -148,6 +149,14 @@ export const expenses = pgTable(
     accountId: integer("account_id").notNull(),
     partyId: integer("party_id").notNull(),
     expenseCategoryId: integer("expense_category_id").notNull(),
+    // Defaults retain compatibility with W1.2 expenses created before money fields.
+    amountMinor: bigint("amount_minor", { mode: "bigint" })
+      .default(0n)
+      .notNull(),
+    currency: text("currency").default("USD").notNull(),
+    installmentNumber: integer("installment_number").default(1).notNull(),
+    installmentCount: integer("installment_count").default(1).notNull(),
+    occurredAt: timestamp("occurred_at").defaultNow().notNull(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
   (table) => ({
@@ -174,6 +183,121 @@ export const expenses = pgTable(
       name: "expenses_book_id_expense_category_id_fk",
       columns: [table.bookId, table.expenseCategoryId],
       foreignColumns: [expenseCategories.bookId, expenseCategories.id],
+    }),
+    installmentCheck: check(
+      "expenses_installment_check",
+      sql`${table.installmentNumber} >= 1 and ${table.installmentCount} >= ${table.installmentNumber}`,
+    ),
+  }),
+);
+
+export const payments = pgTable(
+  "payments",
+  {
+    id: serial("id").notNull(),
+    bookId: integer("book_id").notNull(),
+    accountId: integer("account_id").notNull(),
+    partyId: integer("party_id"),
+    amountMinor: bigint("amount_minor", { mode: "bigint" }).notNull(),
+    currency: text("currency").notNull(),
+    occurredAt: timestamp("occurred_at").defaultNow().notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => ({
+    primaryKey: primaryKey({
+      name: "payments_book_id_id_pk",
+      columns: [table.bookId, table.id],
+    }),
+    bookForeignKey: foreignKey({
+      name: "payments_book_id_books_id_fk",
+      columns: [table.bookId],
+      foreignColumns: [books.id],
+    }),
+    accountForeignKey: foreignKey({
+      name: "payments_book_id_account_id_fk",
+      columns: [table.bookId, table.accountId],
+      foreignColumns: [accounts.bookId, accounts.id],
+    }),
+    partyForeignKey: foreignKey({
+      name: "payments_book_id_party_id_fk",
+      columns: [table.bookId, table.partyId],
+      foreignColumns: [parties.bookId, parties.id],
+    }),
+    amountCheck: check(
+      "payments_amount_minor_positive",
+      sql`${table.amountMinor} > 0`,
+    ),
+    currencyCheck: check(
+      "payments_currency_check",
+      sql`${table.currency} ~ '^[A-Z]{3}$'`,
+    ),
+  }),
+);
+
+export const expenseSettlements = pgTable(
+  "expense_settlements",
+  {
+    id: serial("id").notNull(),
+    bookId: integer("book_id").notNull(),
+    expenseId: integer("expense_id").notNull(),
+    paymentId: integer("payment_id").notNull(),
+    amountMinor: bigint("amount_minor", { mode: "bigint" }).notNull(),
+    currency: text("currency").notNull(),
+    voidedAt: timestamp("voided_at"),
+    voidedBy: text("voided_by"),
+    voidReason: text("void_reason"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => ({
+    primaryKey: primaryKey({
+      name: "expense_settlements_book_id_id_pk",
+      columns: [table.bookId, table.id],
+    }),
+    bookForeignKey: foreignKey({
+      name: "expense_settlements_book_id_books_id_fk",
+      columns: [table.bookId],
+      foreignColumns: [books.id],
+    }),
+    expenseForeignKey: foreignKey({
+      name: "expense_settlements_book_id_expense_id_fk",
+      columns: [table.bookId, table.expenseId],
+      foreignColumns: [expenses.bookId, expenses.id],
+    }),
+    paymentForeignKey: foreignKey({
+      name: "expense_settlements_book_id_payment_id_fk",
+      columns: [table.bookId, table.paymentId],
+      foreignColumns: [payments.bookId, payments.id],
+    }),
+    amountCheck: check(
+      "expense_settlements_amount_minor_positive",
+      sql`${table.amountMinor} > 0`,
+    ),
+    currencyCheck: check(
+      "expense_settlements_currency_check",
+      sql`${table.currency} ~ '^[A-Z]{3}$'`,
+    ),
+  }),
+);
+
+export const idempotencyRecords = pgTable(
+  "idempotency_records",
+  {
+    bookId: integer("book_id").notNull(),
+    key: text("key").notNull(),
+    operation: text("operation").notNull(),
+    resourceType: text("resource_type").notNull(),
+    resourceId: text("resource_id").notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => ({
+    primaryKey: primaryKey({
+      name: "idempotency_records_book_id_key_pk",
+      columns: [table.bookId, table.key],
+    }),
+    bookForeignKey: foreignKey({
+      name: "idempotency_records_book_id_books_id_fk",
+      columns: [table.bookId],
+      foreignColumns: [books.id],
     }),
   }),
 );

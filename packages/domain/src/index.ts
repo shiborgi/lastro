@@ -99,6 +99,104 @@ export class ConflictError extends LastroError {
   }
 }
 
+export class InvalidMoneyError extends LastroError {
+  constructor(message: string) {
+    super("INVALID_MONEY", message, 400);
+    this.name = "InvalidMoneyError";
+  }
+}
+
+export class InvalidInstallmentError extends LastroError {
+  constructor() {
+    super("INVALID_INSTALLMENT", "INVALID_INSTALLMENT", 400);
+    this.name = "InvalidInstallmentError";
+  }
+}
+
+export type Result<T> =
+  | { ok: true; value: T }
+  | { ok: false; error: LastroError };
+
+export type Money = Readonly<{ minor: bigint; currency: string }>;
+
+export function money(minor: bigint, currency: string): Result<Money> {
+  if (minor < 0n || !currency.trim()) {
+    return {
+      ok: false,
+      error: new InvalidMoneyError("minor and currency are required"),
+    };
+  }
+  return { ok: true, value: Object.freeze({ minor, currency }) };
+}
+
+export function addMoney(left: Money, right: Money): Result<Money> {
+  if (left.currency !== right.currency) {
+    return { ok: false, error: new InvalidMoneyError("currency mismatch") };
+  }
+  return money(left.minor + right.minor, left.currency);
+}
+
+export type Installment = Readonly<{ number: number; count: number }>;
+
+export function installment(
+  number: number,
+  count: number,
+): Result<Installment> {
+  if (
+    !Number.isInteger(number) ||
+    !Number.isInteger(count) ||
+    number < 1 ||
+    count < 1 ||
+    number > count
+  ) {
+    return { ok: false, error: new InvalidInstallmentError() };
+  }
+  return { ok: true, value: Object.freeze({ number, count }) };
+}
+
+export type Settlement = Readonly<{ amount: Money; voidedAt?: Date | null }>;
+export type FinancialStatus = "OPEN" | "PARTIALLY_SETTLED" | "SETTLED";
+
+export function settledAmount(
+  currency: string,
+  settlements: readonly Settlement[],
+): Result<Money> {
+  let total = 0n;
+  for (const settlement of settlements) {
+    if (settlement.voidedAt) continue;
+    if (settlement.amount.currency !== currency) {
+      return { ok: false, error: new InvalidMoneyError("currency mismatch") };
+    }
+    total += settlement.amount.minor;
+  }
+  return money(total, currency);
+}
+
+export function financialStatus(
+  total: Money,
+  settlements: readonly Settlement[],
+): Result<FinancialStatus> {
+  const settled = settledAmount(total.currency, settlements);
+  if (!settled.ok) return settled;
+  if (settled.value.minor === 0n) return { ok: true, value: "OPEN" };
+  return {
+    ok: true,
+    value: settled.value.minor >= total.minor ? "SETTLED" : "PARTIALLY_SETTLED",
+  };
+}
+
+export function availableBalance(
+  total: Money,
+  settlements: readonly Settlement[],
+): Result<Money> {
+  const settled = settledAmount(total.currency, settlements);
+  if (!settled.ok) return settled;
+  return money(
+    total.minor > settled.value.minor ? total.minor - settled.value.minor : 0n,
+    total.currency,
+  );
+}
+
 function isNonEmptyString(value: unknown): value is string {
   return typeof value === "string" && value.trim().length > 0;
 }
@@ -185,6 +283,11 @@ export type Expense = {
   accountId: string;
   partyId: string;
   expenseCategoryId: string;
+  amountMinor?: bigint;
+  currency?: string;
+  installmentNumber?: number;
+  installmentCount?: number;
+  occurredAt?: Date;
   createdAt?: Date;
 };
 
