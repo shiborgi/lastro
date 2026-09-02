@@ -24,3 +24,25 @@ spec -> spec-review -> plan -> plan-review -> build -> build-review -> ship
 
 GitHub synchronization maps initiatives to wiki pages, waves to milestones, and
 works to issues.
+
+## Local development
+
+Prerequisites: [Bun](https://bun.sh) and Docker Compose.
+
+Start PostgreSQL 16:
+
+```bash
+docker compose up -d
+```
+
+The database listens on `localhost:5432` with user/password/database `lastro`.
+Then install and migrate:
+
+```bash
+bun install
+bun run db:migrate
+```
+
+`bun install --frozen-lockfile && bun run check` is Bun-only and does not start
+Docker. `bun run test:integration` requires Docker Compose: it starts the stack,
+runs migrations twice, and checks `/health` on the API and MCP listeners.

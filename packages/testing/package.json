@@ -1,0 +1,26 @@
+{
+  "name": "@lastro/testing",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "lint": "biome check .",
+    "test": "bun test",
+    "test:integration": "bun src/integration.ts",
+    "build": "mkdir -p dist && echo \"stub build for testing\" > dist/index.js",
+    "check": "bun run typecheck && bun run lint && bun run test && bun run build"
+  },
+  "dependencies": {
+    "@lastro/db": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.3",
+    "@types/node": "^22.7.4"
+  }
+}
