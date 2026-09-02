@@ -1,0 +1,154 @@
+{
+  "schemaVersion": 1,
+  "baseBranch": "main",
+  "verification": {
+    "argv": [
+      "sh",
+      "-c",
+      "bun install --frozen-lockfile && bun run check"
+    ],
+    "timeoutMs": 600000,
+    "sharedPaths": [
+      "node_modules"
+    ]
+  },
+  "maxReviewReturns": 3,
+  "agentCatalog": {
+    "argv": [
+      "node",
+      "/Users/server/Development/shiborgi/agentpatrol/bin/agentpatrol.js",
+      "resolve",
+      "--json"
+    ],
+    "timeoutMs": 10000,
+    "defaults": {
+      "spec": {
+        "agent": "agentpatrol/architect-lean",
+        "version": "1.0.0"
+      },
+      "plan": {
+        "agent": "agentpatrol/tech-lead-lean",
+        "version": "1.0.0"
+      },
+      "build": {
+        "agent": "agentpatrol/developer-lean",
+        "version": "1.0.0"
+      },
+      "spec-review": {
+        "agent": "agentpatrol/chief-architect",
+        "version": "1.0.0"
+      },
+      "plan-review": {
+        "agent": "agentpatrol/principal-engineer",
+        "version": "1.0.0"
+      },
+      "build-review": {
+        "agent": "agentpatrol/qa-engineer",
+        "version": "1.0.0"
+      },
+      "ship": {
+        "agent": "agentpatrol/release-manager",
+        "version": "1.0.0"
+      }
+    }
+  },
+  "contextPatrol": {
+    "argv": [
+      "node",
+      "/Users/server/Development/shiborgi/contextpatrol/bin/contextpatrol.js",
+      "query",
+      "--input",
+      "-"
+    ],
+    "timeoutMs": 60000,
+    "profiles": {
+      "requirements": {
+        "facets": [
+          "structure",
+          "source"
+        ],
+        "maxOutputBytes": 19200,
+        "sourceDepth": "full"
+      },
+      "requirements-review": {
+        "facets": [
+          "structure",
+          "symbols",
+          "relations",
+          "source"
+        ],
+        "maxOutputBytes": 24000,
+        "sourceDepth": "signatures"
+      },
+      "impact": {
+        "facets": [
+          "changes",
+          "symbols",
+          "relations",
+          "tests"
+        ],
+        "maxOutputBytes": 24000
+      },
+      "plan-review": {
+        "facets": [
+          "changes",
+          "relations",
+          "source",
+          "tests"
+        ],
+        "maxOutputBytes": 24000,
+        "sourceDepth": "signatures"
+      },
+      "implementation": {
+        "facets": [
+          "symbols",
+          "source",
+          "tests"
+        ],
+        "maxOutputBytes": 24000,
+        "sourceDepth": "full"
+      },
+      "candidate-review": {
+        "facets": [
+          "changes",
+          "symbols",
+          "relations",
+          "source",
+          "tests"
+        ],
+        "maxOutputBytes": 32000,
+        "sourceDepth": "full"
+      },
+      "readiness": {
+        "facets": [
+          "changes",
+          "tests",
+          "relations"
+        ],
+        "maxOutputBytes": 12800
+      }
+    },
+    "defaults": {
+      "spec": "requirements",
+      "spec-review": "requirements-review",
+      "plan": "impact",
+      "plan-review": "plan-review",
+      "build": "implementation",
+      "build-review": "candidate-review",
+      "ship": "readiness"
+    }
+  },
+  "remote": {
+    "github": {
+      "enabled": true,
+      "repo": "shiborgi/lastro",
+      "gitRemote": "origin",
+      "tokenEnv": "GITHUB_TOKEN",
+      "wiki": true,
+      "milestones": true,
+      "issues": true,
+      "comments": true,
+      "pushMain": true
+    }
+  }
+}
