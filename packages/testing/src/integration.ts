@@ -69,16 +69,24 @@ try {
       "test",
       "./packages/testing/src/wave12.integration.ts",
       "./packages/testing/src/wave13.integration.ts",
+      "./packages/testing/src/wave14.integration.ts",
     ],
     {
       cwd: REPO_ROOT,
-      env: { ...process.env, DATABASE_URL },
+      env: {
+        ...process.env,
+        DATABASE_URL,
+        API_URL: "http://127.0.0.1:3456",
+        MCP_URL: "http://127.0.0.1:3457/mcp",
+      },
       stdout: "inherit",
       stderr: "inherit",
     },
   );
   if ((await invariants.exited) !== 0) {
-    throw new Error("WAVE-1.2/WAVE-1.3 PostgreSQL invariant tests failed");
+    throw new Error(
+      "WAVE-1.2/WAVE-1.3/WAVE-1.4 PostgreSQL invariant tests failed",
+    );
   }
 } finally {
   for (const child of children) {

@@ -102,7 +102,7 @@ export type ApplicationRepository = {
   ) => Promise<RevenueCategory>;
   listRevenueCategories?: (bookId: string) => Promise<RevenueCategory[]>;
   createExpense?: (
-    input: Omit<Expense, "id">,
+    input: Omit<Expense, "id"> & { idempotencyKey?: string },
     audit: AuditEvent,
   ) => Promise<Expense>;
   listExpenses?: (bookId: string) => Promise<Expense[]>;
@@ -127,7 +127,7 @@ export type ApplicationRepository = {
   getExpense?: (bookId: string, id: string) => Promise<FinancialExpense | null>;
   listExpenseSettlements?: (
     bookId: string,
-    expenseId: string,
+    expenseId?: string,
   ) => Promise<ExpenseSettlement[]>;
   listPendingExpenses?: (bookId: string) => Promise<FinancialExpense[]>;
 };
@@ -180,6 +180,26 @@ export type VoidExpenseSettlementCommand = CommandContext & {
 };
 
 export type ExpenseQuery = CommandContext & { id: string };
+export type PageQuery = CommandContext & { cursor?: string; limit: number };
+export type Page<T> = { items: T[]; nextCursor: string | null };
+
+function page<T extends { id: string | number }>(
+  items: T[],
+  cursor: string | undefined,
+  limit: number,
+): Page<T> {
+  const sorted = [...items].sort(
+    (left, right) => Number(left.id) - Number(right.id),
+  );
+  const start = cursor
+    ? Math.max(0, sorted.findIndex((item) => String(item.id) === cursor) + 1)
+    : 0;
+  const result = sorted.slice(start, start + limit);
+  return {
+    items: result,
+    nextCursor: result.length === limit ? String(result.at(-1)?.id) : null,
+  };
+}
 
 function requireText(value: string, field: string): string {
   if (!value.trim()) throw new Error(`${field} is required`);
@@ -419,6 +439,7 @@ export function createApplication(repository: ApplicationRepository) {
           installmentNumber: input.installmentNumber,
           installmentCount: input.installmentCount,
           occurredAt: input.occurredAt,
+          idempotencyKey: context.idempotencyKey,
         },
         auditFor(context, "expense.created", "expense", {
           accountId: input.accountId,
@@ -432,6 +453,16 @@ export function createApplication(repository: ApplicationRepository) {
       const context = contextFor(contextInput);
       assertAuthorized(context, operations.listExpenses);
       return method(repository, "listExpenses")(context.bookId);
+    },
+
+    async listExpensesPage(input: PageQuery): Promise<Page<Expense>> {
+      const context = contextFor(input.context);
+      assertAuthorized(context, operations.listExpenses);
+      return page(
+        await method(repository, "listExpenses")(context.bookId),
+        input.cursor,
+        input.limit,
+      );
     },
 
     async createPayment(input: CreatePaymentCommand): Promise<Payment> {
@@ -463,6 +494,16 @@ export function createApplication(repository: ApplicationRepository) {
       const context = contextFor(contextInput);
       assertAuthorized(context, operations.listExpenses);
       return method(repository, "listPayments")(context.bookId);
+    },
+
+    async listPaymentsPage(input: PageQuery): Promise<Page<Payment>> {
+      const context = contextFor(input.context);
+      assertAuthorized(context, operations.listExpenses);
+      return page(
+        await method(repository, "listPayments")(context.bookId),
+        input.cursor,
+        input.limit,
+      );
     },
 
     async createExpenseSettlement(
@@ -576,12 +617,82 @@ export function createApplication(repository: ApplicationRepository) {
       );
     },
 
+    async listExpenseSettlementsPage(
+      input: PageQuery,
+    ): Promise<Page<ExpenseSettlement>> {
+      const context = contextFor(input.context);
+      assertAuthorized(context, operations.listExpenses);
+      return page(
+        await method(repository, "listExpenseSettlements")(context.bookId),
+        input.cursor,
+        input.limit,
+      );
+    },
+
     async listPendingExpenses(
       contextInput: unknown,
     ): Promise<FinancialExpense[]> {
       const context = contextFor(contextInput);
       assertAuthorized(context, operations.listExpenses);
       return method(repository, "listPendingExpenses")(context.bookId);
+    },
+
+    async getBookPosition(input: PageQuery): Promise<{
+      expenses: Page<{
+        expense: FinancialExpense;
+        outstandingMinor: bigint;
+        status: FinancialStatus;
+      }>;
+      totals: { currency: string; outstandingMinor: bigint; count: number }[];
+    }> {
+      const context = contextFor(input.context);
+      assertAuthorized(context, operations.listExpenses);
+      const expenses = await method(
+        repository,
+        "listPendingExpenses",
+      )(context.bookId);
+      const positioned = (
+        await Promise.all(
+          expenses.map(async (expense) => ({
+            expense,
+            outstandingMinor: (
+              await this.getExpenseBalance({ context, id: String(expense.id) })
+            ).minor,
+            status: await this.getExpenseStatus({
+              context,
+              id: String(expense.id),
+            }),
+          })),
+        )
+      ).filter((item) => item.outstandingMinor > 0n);
+      const totals = new Map<
+        string,
+        { outstandingMinor: bigint; count: number }
+      >();
+      for (const item of positioned) {
+        const current = totals.get(item.expense.currency) ?? {
+          outstandingMinor: 0n,
+          count: 0,
+        };
+        current.outstandingMinor += item.outstandingMinor;
+        current.count += 1;
+        totals.set(item.expense.currency, current);
+      }
+      const expensePage = page(
+        positioned.map((item) => ({ ...item, id: item.expense.id })),
+        input.cursor,
+        input.limit,
+      );
+      return {
+        expenses: {
+          items: expensePage.items.map(({ id: _id, ...item }) => item),
+          nextCursor: expensePage.nextCursor,
+        },
+        totals: [...totals].map(([currency, total]) => ({
+          currency,
+          ...total,
+        })),
+      };
     },
   };
 }

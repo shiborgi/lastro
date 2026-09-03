@@ -181,6 +181,7 @@ export function createAuthService(store: AuthStore) {
       bookId: string;
       source?: Source;
       correlationId?: string;
+      idempotencyKey?: string;
     }): Promise<ExecutionContext | null> {
       if (!input.sessionId.trim() || !input.secret.trim()) return null;
       const session = await store.getSession(input.sessionId);
@@ -199,6 +200,7 @@ export function createAuthService(store: AuthStore) {
         role,
         source: input.source ?? "API",
         correlationId: input.correlationId ?? randomUUID(),
+        idempotencyKey: input.idempotencyKey,
       });
     },
 

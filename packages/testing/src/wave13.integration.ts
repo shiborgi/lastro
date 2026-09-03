@@ -187,8 +187,8 @@ describe("WAVE-1.3 PostgreSQL settlement invariants", () => {
           audit(book.id, "payment.created"),
         );
       const settle = (
-        expenseId: number,
-        paymentId: number,
+        expenseId: string | number,
+        paymentId: string | number,
         amountMinor: bigint,
       ) =>
         repositories.createExpenseSettlement(

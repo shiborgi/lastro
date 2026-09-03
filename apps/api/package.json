@@ -15,6 +15,7 @@
     "@lastro/application": "workspace:*",
     "@lastro/auth": "workspace:*",
     "@lastro/config": "workspace:*",
+    "@lastro/contracts": "workspace:*",
     "@lastro/db": "workspace:*",
     "@lastro/domain": "workspace:*",
     "hono": "^4.6.12"

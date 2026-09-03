@@ -94,6 +94,34 @@ function expenseFromRow(row: typeof schema.expenses.$inferSelect): Expense {
   };
 }
 
+function paymentFromRow(row: typeof schema.payments.$inferSelect) {
+  return {
+    id: String(row.id),
+    bookId: String(row.bookId),
+    accountId: String(row.accountId),
+    partyId: row.partyId === null ? null : String(row.partyId),
+    amountMinor: row.amountMinor,
+    currency: row.currency,
+    occurredAt: row.occurredAt,
+    createdAt: row.createdAt,
+  };
+}
+
+function settlementFromRow(row: typeof schema.expenseSettlements.$inferSelect) {
+  return {
+    id: String(row.id),
+    bookId: String(row.bookId),
+    expenseId: String(row.expenseId),
+    paymentId: String(row.paymentId),
+    amountMinor: row.amountMinor,
+    currency: row.currency,
+    voidedAt: row.voidedAt,
+    voidedBy: row.voidedBy,
+    voidReason: row.voidReason,
+    createdAt: row.createdAt,
+  };
+}
+
 function auditValues(audit: AuditEvent, resourceId?: string) {
   return {
     actorType: audit.actorType,
@@ -332,14 +360,47 @@ export function createRepositories(db: Database) {
     },
 
     async createExpense(
-      input: Omit<Expense, "id">,
+      input: Omit<Expense, "id"> & { idempotencyKey?: string },
       audit: AuditEvent,
     ): Promise<Expense> {
       return db.transaction(async (tx) => {
+        const bookId = bookNumber(input.bookId);
+        if (input.idempotencyKey) {
+          await tx.execute(
+            sql`select pg_advisory_xact_lock(hashtext(${`${bookId}:${input.idempotencyKey}`}))`,
+          );
+          const [existing] = await tx
+            .select()
+            .from(schema.idempotencyRecords)
+            .where(
+              and(
+                eq(schema.idempotencyRecords.bookId, bookId),
+                eq(schema.idempotencyRecords.key, input.idempotencyKey),
+              ),
+            );
+          if (existing) {
+            if (existing.operation !== "expense.create")
+              throw new Error(
+                "idempotency key was already used for another operation",
+              );
+            const [expense] = await tx
+              .select()
+              .from(schema.expenses)
+              .where(
+                and(
+                  eq(schema.expenses.bookId, bookId),
+                  eq(schema.expenses.id, Number(existing.resourceId)),
+                ),
+              );
+            if (!expense)
+              throw new Error("idempotency record references no expense");
+            return expenseFromRow(expense);
+          }
+        }
         const [row] = await tx
           .insert(schema.expenses)
           .values({
-            bookId: bookNumber(input.bookId),
+            bookId,
             accountId: Number(input.accountId),
             partyId: Number(input.partyId),
             expenseCategoryId: Number(input.expenseCategoryId),
@@ -353,6 +414,15 @@ export function createRepositories(db: Database) {
         await tx
           .insert(schema.auditEvents)
           .values(auditValues(audit, String(row.id)));
+        if (input.idempotencyKey) {
+          await tx.insert(schema.idempotencyRecords).values({
+            bookId,
+            key: input.idempotencyKey,
+            operation: "expense.create",
+            resourceType: "expense",
+            resourceId: String(row.id),
+          });
+        }
         return expenseFromRow(row);
       });
     },
@@ -363,6 +433,36 @@ export function createRepositories(db: Database) {
         .from(schema.expenses)
         .where(eq(schema.expenses.bookId, bookNumber(bookId)));
       return rows.map(expenseFromRow);
+    },
+
+    async getExpense(bookId: string, id: string) {
+      const [row] = await db
+        .select()
+        .from(schema.expenses)
+        .where(
+          and(
+            eq(schema.expenses.bookId, bookNumber(bookId)),
+            eq(schema.expenses.id, Number(id)),
+          ),
+        );
+      if (!row) return null;
+      return {
+        ...expenseFromRow(row),
+        amountMinor: row.amountMinor,
+        currency: row.currency,
+      };
+    },
+
+    async listPendingExpenses(bookId: string) {
+      const rows = await db
+        .select()
+        .from(schema.expenses)
+        .where(eq(schema.expenses.bookId, bookNumber(bookId)));
+      return rows.map((row) => ({
+        ...expenseFromRow(row),
+        amountMinor: row.amountMinor,
+        currency: row.currency,
+      }));
     },
 
     async createPayment(
@@ -409,7 +509,7 @@ export function createRepositories(db: Database) {
               );
             if (!payment)
               throw new Error("idempotency record references no payment");
-            return payment;
+            return paymentFromRow(payment);
           }
         }
         const [payment] = await tx
@@ -435,8 +535,16 @@ export function createRepositories(db: Database) {
             resourceId: String(payment.id),
           });
         }
-        return payment;
+        return paymentFromRow(payment);
       });
+    },
+
+    async listPayments(bookId: string) {
+      const rows = await db
+        .select()
+        .from(schema.payments)
+        .where(eq(schema.payments.bookId, bookNumber(bookId)));
+      return rows.map(paymentFromRow);
     },
 
     async createExpenseSettlement(
@@ -490,7 +598,7 @@ export function createRepositories(db: Database) {
             if (!settlement) {
               throw new Error("idempotency record references no settlement");
             }
-            return settlement;
+            return settlementFromRow(settlement);
           }
         }
         const [settlement] = await tx
@@ -515,7 +623,7 @@ export function createRepositories(db: Database) {
             resourceId: String(settlement.id),
           });
         }
-        return settlement;
+        return settlementFromRow(settlement);
       });
     },
 
@@ -548,8 +656,23 @@ export function createRepositories(db: Database) {
         await tx
           .insert(schema.auditEvents)
           .values(auditValues(audit, String(settlement.id)));
-        return settlement;
+        return settlementFromRow(settlement);
       });
+    },
+
+    async listExpenseSettlements(bookId: string, expenseId?: string) {
+      const rows = await db
+        .select()
+        .from(schema.expenseSettlements)
+        .where(
+          and(
+            eq(schema.expenseSettlements.bookId, bookNumber(bookId)),
+            expenseId === undefined
+              ? undefined
+              : eq(schema.expenseSettlements.expenseId, Number(expenseId)),
+          ),
+        );
+      return rows.map(settlementFromRow);
     },
 
     async listAuditEvents(correlationId: string) {

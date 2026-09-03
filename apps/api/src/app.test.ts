@@ -19,3 +19,14 @@ describe("api health", () => {
     expect(body.database.status).toBe("up");
   });
 });
+
+describe("v1 API boundary", () => {
+  test("uses a structured authentication error for Book-scoped routes", async () => {
+    const app = createApi({ ping: async () => true });
+    const response = await app.request("/v1/books/1/expenses");
+    expect(response.status).toBe(401);
+    expect(await response.json()).toEqual({
+      error: { code: "UNAUTHORIZED", message: "authentication is required" },
+    });
+  });
+});

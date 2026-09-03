@@ -15,11 +15,15 @@
     "@lastro/application": "workspace:*",
     "@lastro/auth": "workspace:*",
     "@lastro/config": "workspace:*",
+    "@lastro/contracts": "workspace:*",
     "@lastro/db": "workspace:*",
     "@lastro/domain": "workspace:*",
-    "hono": "^4.6.12"
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "hono": "^4.6.12",
+    "zod": "^4.5.4"
   },
   "devDependencies": {
+    "@lastro/api": "workspace:*",
     "typescript": "^5.6.3",
     "@types/node": "^22.7.4"
   }
