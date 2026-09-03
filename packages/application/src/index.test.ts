@@ -184,4 +184,111 @@ describe("financial application commands", () => {
       installmentCount: 3,
     });
   });
+
+  test("creates a revenue scoped to the execution Book with idempotency", async () => {
+    let created: Record<string, unknown> | undefined;
+    const application = createApplication({
+      createRevenue: async (input) => {
+        created = input;
+        return { id: "revenue-1", ...input };
+      },
+    });
+
+    await application.createRevenue({
+      context: { ...baseContext, bookId: "2", idempotencyKey: "revenue-key" },
+      accountId: "account-1",
+      partyId: "party-1",
+      revenueCategoryId: "category-1",
+      amountMinor: 200n,
+      currency: "USD",
+    });
+
+    expect(created).toMatchObject({
+      bookId: "2",
+      accountId: "account-1",
+      partyId: "party-1",
+      revenueCategoryId: "category-1",
+      amountMinor: 200n,
+      currency: "USD",
+      idempotencyKey: "revenue-key",
+    });
+  });
+
+  test("creates a transfer only when the pair shares a Book and currency", async () => {
+    let created: Record<string, unknown> | undefined;
+    const application = createApplication({
+      createTransfer: async (input) => {
+        created = input;
+        return {
+          id: "transfer-1",
+          sourcePaymentId: "payment-1",
+          destinationReceiptId: "receipt-1",
+          correlationId: "correlation-1",
+          ...input,
+        };
+      },
+    });
+
+    await expect(
+      application.createTransfer({
+        context: baseContext,
+        sourceAccountId: "account-1",
+        destinationAccountId: "account-1",
+        amountMinor: 50n,
+        currency: "USD",
+      }),
+    ).rejects.toMatchObject({ code: "INVALID_TRANSFER" });
+    expect(created).toBeUndefined();
+
+    const transfer = await application.createTransfer({
+      context: baseContext,
+      sourceAccountId: "account-1",
+      destinationAccountId: "account-2",
+      amountMinor: 50n,
+      currency: "USD",
+    });
+    expect(transfer).toMatchObject({
+      bookId: "1",
+      amountMinor: 50n,
+      currency: "USD",
+    });
+  });
+
+  test("rejects a transfer with an invalid amount", async () => {
+    const application = createApplication({
+      createTransfer: async () => {
+        throw new Error("should not be called");
+      },
+    });
+    await expect(
+      application.createTransfer({
+        context: baseContext,
+        sourceAccountId: "account-1",
+        destinationAccountId: "account-2",
+        amountMinor: 0n,
+        currency: "USD",
+      }),
+    ).rejects.toThrow("amountMinor must be positive");
+  });
+
+  test("forbidden revenue mutations do not reach the repository", async () => {
+    let called = false;
+    const application = createApplication({
+      createRevenue: async () => {
+        called = true;
+        return { id: "revenue-1" } as never;
+      },
+    });
+    await expect(
+      application.createRevenue({
+        context: { ...baseContext, role: "VIEWER" },
+        accountId: "account-1",
+        partyId: "party-1",
+        revenueCategoryId: "category-1",
+        amountMinor: 200n,
+        currency: "USD",
+      }),
+    ).rejects.toThrow("FORBIDDEN");
+    expect(called).toBe(false);
+  });
 });

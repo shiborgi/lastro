@@ -34,6 +34,14 @@ export const operations = {
   createRevenueCategory: "CREATE_REVENUE_CATEGORY",
   createExpense: "CREATE_EXPENSE",
   listExpenses: "LIST_EXPENSES",
+  createRevenue: "CREATE_REVENUE",
+  listRevenues: "LIST_REVENUES",
+  createReceipt: "CREATE_RECEIPT",
+  listReceipts: "LIST_RECEIPTS",
+  createRevenueSettlement: "CREATE_REVENUE_SETTLEMENT",
+  listRevenueSettlements: "LIST_REVENUE_SETTLEMENTS",
+  voidRevenueSettlement: "VOID_REVENUE_SETTLEMENT",
+  createTransfer: "CREATE_TRANSFER",
   manageMembers: "MANAGE_MEMBERS",
   manageAgentCredentials: "MANAGE_AGENT_CREDENTIALS",
 } as const;
@@ -47,6 +55,9 @@ const readOperations = new Set<Operation>([
   operations.listExpenseCategories,
   operations.listRevenueCategories,
   operations.listExpenses,
+  operations.listRevenues,
+  operations.listReceipts,
+  operations.listRevenueSettlements,
 ]);
 
 const financialWriteOperations = new Set<Operation>([
@@ -58,6 +69,11 @@ const financialWriteOperations = new Set<Operation>([
   operations.deleteExpenseCategory,
   operations.createRevenueCategory,
   operations.createExpense,
+  operations.createRevenue,
+  operations.createReceipt,
+  operations.createRevenueSettlement,
+  operations.voidRevenueSettlement,
+  operations.createTransfer,
 ]);
 
 export class LastroError extends Error {
@@ -305,3 +321,87 @@ export type AuditEvent = {
   payload?: Record<string, unknown>;
   createdAt?: Date;
 };
+
+export type Revenue = {
+  id: string;
+  bookId: string;
+  accountId: string;
+  partyId: string;
+  revenueCategoryId: string;
+  amountMinor?: bigint;
+  currency?: string;
+  occurredAt?: Date;
+  createdAt?: Date;
+};
+
+export type Receipt = {
+  id: string;
+  bookId: string;
+  accountId: string;
+  partyId?: string | null;
+  amountMinor: bigint;
+  currency: string;
+  occurredAt?: Date;
+  createdAt?: Date;
+};
+
+export type RevenueSettlement = {
+  id: string;
+  bookId: string;
+  revenueId: string;
+  receiptId: string;
+  amountMinor: bigint;
+  currency: string;
+  voidedAt?: Date | null;
+  voidedBy?: string | null;
+  voidReason?: string | null;
+  createdAt?: Date;
+};
+
+export type Transfer = {
+  id: string;
+  bookId: string;
+  sourcePaymentId: string;
+  destinationReceiptId: string;
+  correlationId: string;
+  amountMinor: bigint;
+  currency: string;
+  createdAt?: Date;
+};
+
+export function validateTransferPair(input: {
+  bookId: string;
+  sourceAccountId: string;
+  destinationAccountId: string;
+  amountMinor: bigint;
+  currency: string;
+}): Result<{ sourceAccountId: string; destinationAccountId: string }> {
+  if (!input.bookId.trim() || !input.currency.trim()) {
+    return {
+      ok: false,
+      error: new InvalidMoneyError("bookId and currency are required"),
+    };
+  }
+  if (input.amountMinor <= 0n) {
+    return {
+      ok: false,
+      error: new InvalidMoneyError("amountMinor must be positive"),
+    };
+  }
+  if (input.sourceAccountId === input.destinationAccountId) {
+    return {
+      ok: false,
+      error: new LastroError(
+        "INVALID_TRANSFER",
+        "source and destination accounts must differ",
+      ),
+    };
+  }
+  return {
+    ok: true,
+    value: {
+      sourceAccountId: input.sourceAccountId,
+      destinationAccountId: input.destinationAccountId,
+    },
+  };
+}

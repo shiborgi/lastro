@@ -22,6 +22,13 @@
       "when": 1788430000000,
       "tag": "0002_wave_13_expense_payments",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1788600000000,
+      "tag": "0003_wave_16_revenue_cycle",
+      "breakpoints": true
     }
   ]
 }

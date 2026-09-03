@@ -2,13 +2,21 @@ import type { Application } from "@lastro/application";
 import { type AuthService, parseBearerCredential } from "@lastro/auth";
 import {
   BookPosition,
+  CashFlow,
   CreateExpense,
   CreateExpenseSettlement,
   CreatePayment,
+  CreateReceipt,
+  CreateRevenue,
+  CreateRevenueSettlement,
+  CreateTransfer,
   CursorPage,
   FinancialResource,
   Page,
+  RevenuePosition,
+  TransferResource,
   VoidExpenseSettlement,
+  VoidRevenueSettlement,
 } from "@lastro/contracts";
 import { LastroError } from "@lastro/domain";
 import { Hono } from "hono";
@@ -98,10 +106,18 @@ export function createApi(opts: {
         value.expenseCategoryId === undefined
           ? undefined
           : String(value.expenseCategoryId),
+      revenueCategoryId:
+        value.revenueCategoryId === undefined
+          ? undefined
+          : String(value.revenueCategoryId),
       expenseId:
         value.expenseId === undefined ? undefined : String(value.expenseId),
       paymentId:
         value.paymentId === undefined ? undefined : String(value.paymentId),
+      revenueId:
+        value.revenueId === undefined ? undefined : String(value.revenueId),
+      receiptId:
+        value.receiptId === undefined ? undefined : String(value.receiptId),
       amountMinor: String(value.amountMinor),
       occurredAt:
         value.occurredAt instanceof Date
@@ -282,6 +298,257 @@ export function createApi(opts: {
     },
   );
 
+  app.get("/v1/books/:bookId/revenues", async (c) => {
+    const context = await v1Context(c);
+    if (!context || !opts.application) return v1Unauthorized(c);
+    const query = CursorPage.safeParse(c.req.query());
+    if (!query.success) return v1Failure(c, query.error);
+    try {
+      const result = await opts.application.listRevenuesPage({
+        context,
+        ...query.data,
+      });
+      return c.json(
+        Page(FinancialResource).parse({
+          items: result.items.map((item) =>
+            resource(item as Record<string, unknown>),
+          ),
+          nextCursor: result.nextCursor,
+        }),
+      );
+    } catch (error) {
+      return v1Failure(c, error);
+    }
+  });
+
+  app.post("/v1/books/:bookId/revenues", async (c) => {
+    const context = await v1Context(c);
+    if (!context || !opts.application) return v1Unauthorized(c);
+    const input = CreateRevenue.safeParse(await c.req.json().catch(() => null));
+    if (!input.success) return v1Failure(c, input.error);
+    try {
+      const revenue = await opts.application.createRevenue({
+        context,
+        ...input.data,
+        amountMinor: BigInt(input.data.amountMinor),
+        occurredAt: input.data.occurredAt
+          ? new Date(input.data.occurredAt)
+          : undefined,
+      });
+      return c.json(
+        { revenue: resource(revenue as Record<string, unknown>) },
+        201,
+      );
+    } catch (error) {
+      return v1Failure(c, error);
+    }
+  });
+
+  app.get("/v1/books/:bookId/receipts", async (c) => {
+    const context = await v1Context(c);
+    if (!context || !opts.application) return v1Unauthorized(c);
+    const query = CursorPage.safeParse(c.req.query());
+    if (!query.success) return v1Failure(c, query.error);
+    try {
+      const result = await opts.application.listReceiptsPage({
+        context,
+        ...query.data,
+      });
+      return c.json(
+        Page(FinancialResource).parse({
+          items: result.items.map((item) =>
+            resource(item as Record<string, unknown>),
+          ),
+          nextCursor: result.nextCursor,
+        }),
+      );
+    } catch (error) {
+      return v1Failure(c, error);
+    }
+  });
+
+  app.post("/v1/books/:bookId/receipts", async (c) => {
+    const context = await v1Context(c);
+    if (!context || !opts.application) return v1Unauthorized(c);
+    const input = CreateReceipt.safeParse(await c.req.json().catch(() => null));
+    if (!input.success) return v1Failure(c, input.error);
+    try {
+      const receipt = await opts.application.createReceipt({
+        context,
+        ...input.data,
+        amountMinor: BigInt(input.data.amountMinor),
+        occurredAt: input.data.occurredAt
+          ? new Date(input.data.occurredAt)
+          : undefined,
+      });
+      return c.json(
+        { receipt: resource(receipt as Record<string, unknown>) },
+        201,
+      );
+    } catch (error) {
+      return v1Failure(c, error);
+    }
+  });
+
+  app.get("/v1/books/:bookId/revenue-settlements", async (c) => {
+    const context = await v1Context(c);
+    if (!context || !opts.application) return v1Unauthorized(c);
+    const query = CursorPage.safeParse(c.req.query());
+    if (!query.success) return v1Failure(c, query.error);
+    try {
+      const result = await opts.application.listRevenueSettlementsPage({
+        context,
+        ...query.data,
+      });
+      return c.json(
+        Page(FinancialResource).parse({
+          items: result.items.map((item) =>
+            resource(item as Record<string, unknown>),
+          ),
+          nextCursor: result.nextCursor,
+        }),
+      );
+    } catch (error) {
+      return v1Failure(c, error);
+    }
+  });
+
+  app.post("/v1/books/:bookId/revenue-settlements", async (c) => {
+    const context = await v1Context(c);
+    if (!context || !opts.application) return v1Unauthorized(c);
+    const input = CreateRevenueSettlement.safeParse(
+      await c.req.json().catch(() => null),
+    );
+    if (!input.success) return v1Failure(c, input.error);
+    try {
+      const settlement = await opts.application.createRevenueSettlement({
+        context,
+        ...input.data,
+        amountMinor: BigInt(input.data.amountMinor),
+      });
+      return c.json(
+        { settlement: resource(settlement as Record<string, unknown>) },
+        201,
+      );
+    } catch (error) {
+      return v1Failure(c, error);
+    }
+  });
+
+  app.post(
+    "/v1/books/:bookId/revenue-settlements/:settlementId/void",
+    async (c) => {
+      const context = await v1Context(c);
+      if (!context || !opts.application) return v1Unauthorized(c);
+      const input = VoidRevenueSettlement.safeParse(
+        await c.req.json().catch(() => ({})),
+      );
+      if (!input.success) return v1Failure(c, input.error);
+      try {
+        const settlement = await opts.application.voidRevenueSettlement({
+          context,
+          id: c.req.param("settlementId"),
+          ...input.data,
+        });
+        return c.json({
+          settlement: resource(settlement as Record<string, unknown>),
+        });
+      } catch (error) {
+        return v1Failure(c, error);
+      }
+    },
+  );
+
+  app.get("/v1/books/:bookId/revenue-position", async (c) => {
+    const context = await v1Context(c);
+    if (!context || !opts.application) return v1Unauthorized(c);
+    const query = CursorPage.safeParse(c.req.query());
+    if (!query.success) return v1Failure(c, query.error);
+    try {
+      const result = await opts.application.getRevenuePosition({
+        context,
+        ...query.data,
+      });
+      return c.json(
+        RevenuePosition.parse({
+          revenues: {
+            items: result.revenues.items.map((item) => ({
+              revenue: resource(item.revenue as Record<string, unknown>),
+              outstandingMinor: item.outstandingMinor.toString(),
+              status: item.status,
+            })),
+            nextCursor: result.revenues.nextCursor,
+          },
+          totals: result.totals.map((total) => ({
+            ...total,
+            outstandingMinor: total.outstandingMinor.toString(),
+          })),
+        }),
+      );
+    } catch (error) {
+      return v1Failure(c, error);
+    }
+  });
+
+  app.post("/v1/books/:bookId/transfers", async (c) => {
+    const context = await v1Context(c);
+    if (!context || !opts.application) return v1Unauthorized(c);
+    const input = CreateTransfer.safeParse(
+      await c.req.json().catch(() => null),
+    );
+    if (!input.success) return v1Failure(c, input.error);
+    try {
+      const transfer = await opts.application.createTransfer({
+        context,
+        ...input.data,
+        amountMinor: BigInt(input.data.amountMinor),
+      });
+      return c.json(
+        TransferResource.parse({
+          ...transfer,
+          id: String(transfer.id),
+          bookId: String(transfer.bookId),
+          sourcePaymentId: String(transfer.sourcePaymentId),
+          destinationReceiptId: String(transfer.destinationReceiptId),
+          amountMinor: String(transfer.amountMinor),
+          createdAt:
+            transfer.createdAt instanceof Date
+              ? transfer.createdAt.toISOString()
+              : undefined,
+        }),
+        201,
+      );
+    } catch (error) {
+      return v1Failure(c, error);
+    }
+  });
+
+  app.get("/v1/books/:bookId/transfers", async (c) => {
+    const context = await v1Context(c);
+    if (!context || !opts.application) return v1Unauthorized(c);
+    try {
+      const transfers = await opts.application.listTransfers(context);
+      return c.json({
+        transfers: transfers.map((transfer) =>
+          TransferResource.parse({
+            ...transfer,
+            id: String(transfer.id),
+            bookId: String(transfer.bookId),
+            sourcePaymentId: String(transfer.sourcePaymentId),
+            destinationReceiptId: String(transfer.destinationReceiptId),
+            amountMinor: String(transfer.amountMinor),
+            createdAt:
+              transfer.createdAt instanceof Date
+                ? transfer.createdAt.toISOString()
+                : undefined,
+          }),
+        ),
+      });
+    } catch (error) {
+      return v1Failure(c, error);
+    }
+  });
+
   app.get("/v1/books/:bookId/position", async (c) => {
     const context = await v1Context(c);
     if (!context || !opts.application) return v1Unauthorized(c);
@@ -305,6 +572,32 @@ export function createApi(opts: {
           totals: result.totals.map((total) => ({
             ...total,
             outstandingMinor: total.outstandingMinor.toString(),
+          })),
+        }),
+      );
+    } catch (error) {
+      return v1Failure(c, error);
+    }
+  });
+
+  app.get("/v1/books/:bookId/cash-flow", async (c) => {
+    const context = await v1Context(c);
+    if (!context || !opts.application) return v1Unauthorized(c);
+    try {
+      const flow = await opts.application.getCashFlow(context);
+      return c.json(
+        CashFlow.parse({
+          inflows: flow.inflows.map((item) => ({
+            ...item,
+            amountMinor: item.amountMinor.toString(),
+          })),
+          outflows: flow.outflows.map((item) => ({
+            ...item,
+            amountMinor: item.amountMinor.toString(),
+          })),
+          transfers: flow.transfers.map((item) => ({
+            ...item,
+            amountMinor: item.amountMinor.toString(),
           })),
         }),
       );

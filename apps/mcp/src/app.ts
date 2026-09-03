@@ -6,6 +6,7 @@ import {
   FinancialResource,
   Id,
   Page,
+  RevenuePosition,
 } from "@lastro/contracts";
 import type { ExecutionContext } from "@lastro/domain";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
@@ -45,10 +46,18 @@ function resource(value: Record<string, unknown>) {
       value.expenseCategoryId === undefined
         ? undefined
         : String(value.expenseCategoryId),
+    revenueCategoryId:
+      value.revenueCategoryId === undefined
+        ? undefined
+        : String(value.revenueCategoryId),
     expenseId:
       value.expenseId === undefined ? undefined : String(value.expenseId),
     paymentId:
       value.paymentId === undefined ? undefined : String(value.paymentId),
+    revenueId:
+      value.revenueId === undefined ? undefined : String(value.revenueId),
+    receiptId:
+      value.receiptId === undefined ? undefined : String(value.receiptId),
     amountMinor: String(value.amountMinor),
     occurredAt:
       value.occurredAt instanceof Date
@@ -79,7 +88,7 @@ function error(message: string) {
 export function createMcpServer(opts: McpOptions, context: ExecutionContext) {
   if (!opts.application) throw new Error("application is required");
   const application = opts.application;
-  const server = new McpServer({ name: "lastro", version: "1.4.0" });
+  const server = new McpServer({ name: "lastro", version: "1.6.0" });
   const requireBook = (bookId: string) => {
     if (bookId !== context.bookId) throw new Error("UNAUTHORIZED_OR_NOT_FOUND");
   };
@@ -223,6 +232,166 @@ export function createMcpServer(opts: McpOptions, context: ExecutionContext) {
             })),
           }),
         );
+      } catch (cause) {
+        return error(cause instanceof Error ? cause.message : "request failed");
+      }
+    },
+  );
+
+  server.registerTool(
+    "list_revenues",
+    {
+      description:
+        "List revenues in an explicitly selected Book using cursor pagination.",
+      annotations: { readOnlyHint: true },
+      inputSchema: toolPage.shape,
+    },
+    async (input) => {
+      try {
+        requireBook(input.bookId);
+        const { bookId: _bookId, ...query } = input;
+        const page = await application.listRevenuesPage({
+          context,
+          ...CursorPage.parse(query),
+        });
+        return result(
+          Page(FinancialResource).parse({
+            items: page.items.map((item) =>
+              resource(item as Record<string, unknown>),
+            ),
+            nextCursor: page.nextCursor,
+          }),
+        );
+      } catch (cause) {
+        return error(cause instanceof Error ? cause.message : "request failed");
+      }
+    },
+  );
+
+  server.registerTool(
+    "list_receipts",
+    {
+      description:
+        "List receipts in an explicitly selected Book using cursor pagination.",
+      annotations: { readOnlyHint: true },
+      inputSchema: toolPage.shape,
+    },
+    async (input) => {
+      try {
+        requireBook(input.bookId);
+        const { bookId: _bookId, ...query } = input;
+        const page = await application.listReceiptsPage({
+          context,
+          ...CursorPage.parse(query),
+        });
+        return result(
+          Page(FinancialResource).parse({
+            items: page.items.map((item) =>
+              resource(item as Record<string, unknown>),
+            ),
+            nextCursor: page.nextCursor,
+          }),
+        );
+      } catch (cause) {
+        return error(cause instanceof Error ? cause.message : "request failed");
+      }
+    },
+  );
+
+  server.registerTool(
+    "list_revenue_settlements",
+    {
+      description:
+        "List revenue settlements in an explicitly selected Book using cursor pagination.",
+      annotations: { readOnlyHint: true },
+      inputSchema: toolPage.shape,
+    },
+    async (input) => {
+      try {
+        requireBook(input.bookId);
+        const { bookId: _bookId, ...query } = input;
+        const page = await application.listRevenueSettlementsPage({
+          context,
+          ...CursorPage.parse(query),
+        });
+        return result(
+          Page(FinancialResource).parse({
+            items: page.items.map((item) =>
+              resource(item as Record<string, unknown>),
+            ),
+            nextCursor: page.nextCursor,
+          }),
+        );
+      } catch (cause) {
+        return error(cause instanceof Error ? cause.message : "request failed");
+      }
+    },
+  );
+
+  server.registerTool(
+    "get_revenue_position",
+    {
+      description:
+        "Get outstanding revenue position for an explicitly selected Book.",
+      annotations: { readOnlyHint: true },
+      inputSchema: toolPage.shape,
+    },
+    async (input) => {
+      try {
+        requireBook(input.bookId);
+        const { bookId: _bookId, ...query } = input;
+        const position = await application.getRevenuePosition({
+          context,
+          ...CursorPage.parse(query),
+        });
+        return result(
+          RevenuePosition.parse({
+            revenues: {
+              items: position.revenues.items.map((item) => ({
+                revenue: resource(item.revenue as Record<string, unknown>),
+                outstandingMinor: item.outstandingMinor.toString(),
+                status: item.status,
+              })),
+              nextCursor: position.revenues.nextCursor,
+            },
+            totals: position.totals.map((total) => ({
+              ...total,
+              outstandingMinor: total.outstandingMinor.toString(),
+            })),
+          }),
+        );
+      } catch (cause) {
+        return error(cause instanceof Error ? cause.message : "request failed");
+      }
+    },
+  );
+
+  server.registerTool(
+    "get_cash_flow",
+    {
+      description:
+        "Get cash inflows, outflows, and internal transfers for an explicitly selected Book.",
+      annotations: { readOnlyHint: true },
+      inputSchema: { bookId: Id },
+    },
+    async (input) => {
+      try {
+        requireBook(input.bookId);
+        const flow = await application.getCashFlow(context);
+        return result({
+          inflows: flow.inflows.map((item) => ({
+            ...item,
+            amountMinor: item.amountMinor.toString(),
+          })),
+          outflows: flow.outflows.map((item) => ({
+            ...item,
+            amountMinor: item.amountMinor.toString(),
+          })),
+          transfers: flow.transfers.map((item) => ({
+            ...item,
+            amountMinor: item.amountMinor.toString(),
+          })),
+        });
       } catch (cause) {
         return error(cause instanceof Error ? cause.message : "request failed");
       }

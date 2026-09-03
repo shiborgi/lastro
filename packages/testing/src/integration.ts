@@ -70,6 +70,7 @@ try {
       "./packages/testing/src/wave12.integration.ts",
       "./packages/testing/src/wave13.integration.ts",
       "./packages/testing/src/wave14.integration.ts",
+      "./packages/testing/src/wave16.integration.ts",
     ],
     {
       cwd: REPO_ROOT,

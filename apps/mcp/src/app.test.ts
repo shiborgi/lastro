@@ -54,10 +54,15 @@ describe("MCP v2 read-only tools", () => {
     const tools = await client.listTools();
     expect(tools.tools.map((tool) => tool.name).sort()).toEqual([
       "get_book_position",
+      "get_cash_flow",
+      "get_revenue_position",
       "list_books",
       "list_expense_settlements",
       "list_expenses",
       "list_payments",
+      "list_receipts",
+      "list_revenue_settlements",
+      "list_revenues",
     ]);
     expect(tools.tools.every((tool) => tool.annotations?.readOnlyHint)).toBe(
       true,

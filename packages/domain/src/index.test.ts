@@ -11,6 +11,7 @@ import {
   installment,
   money,
   operations,
+  validateTransferPair,
 } from "./index";
 
 function resultValue<T>(result: Result<T>): T {
@@ -86,6 +87,84 @@ describe("expense cycle domain", () => {
     expect(installment(0, 3).ok).toBe(false);
     expect(installment(1, 0).ok).toBe(false);
     expect(installment(4, 3).ok).toBe(false);
+  });
+});
+
+describe("revenue cycle domain", () => {
+  test("derives revenue status from active RevenueSettlements and is not directly assignable", () => {
+    const total = money(200n, "USD");
+    const partial = money(80n, "USD");
+    const remaining = money(120n, "USD");
+    if (!total.ok || !partial.ok || !remaining.ok) return;
+    expect(resultValue(financialStatus(total.value, []))).toBe("OPEN");
+    expect(
+      resultValue(financialStatus(total.value, [{ amount: partial.value }])),
+    ).toBe("PARTIALLY_SETTLED");
+    expect(
+      resultValue(
+        financialStatus(total.value, [
+          { amount: partial.value },
+          { amount: remaining.value },
+        ]),
+      ),
+    ).toBe("SETTLED");
+    expect(
+      resultValue(availableBalance(total.value, [{ amount: partial.value }])),
+    ).toEqual({ minor: 120n, currency: "USD" });
+  });
+
+  test("validates a transfer pair links source and destination in one Book and currency", () => {
+    const valid = validateTransferPair({
+      bookId: "1",
+      sourceAccountId: "10",
+      destinationAccountId: "11",
+      amountMinor: 1000n,
+      currency: "BRL",
+    });
+    expect(valid.ok).toBe(true);
+    if (!valid.ok) return;
+    expect(valid.value).toEqual({
+      sourceAccountId: "10",
+      destinationAccountId: "11",
+    });
+    expect(
+      validateTransferPair({
+        bookId: "",
+        sourceAccountId: "10",
+        destinationAccountId: "11",
+        amountMinor: 1000n,
+        currency: "BRL",
+      }).ok,
+    ).toBe(false);
+    expect(
+      validateTransferPair({
+        bookId: "1",
+        sourceAccountId: "10",
+        destinationAccountId: "10",
+        amountMinor: 1000n,
+        currency: "BRL",
+      }).ok,
+    ).toBe(false);
+    expect(
+      validateTransferPair({
+        bookId: "1",
+        sourceAccountId: "10",
+        destinationAccountId: "11",
+        amountMinor: 0n,
+        currency: "BRL",
+      }).ok,
+    ).toBe(false);
+  });
+
+  test("rejects settling a transfer endpoint against an expense or revenue", () => {
+    const expenseSettlement = validateTransferPair({
+      bookId: "1",
+      sourceAccountId: "10",
+      destinationAccountId: "11",
+      amountMinor: 1000n,
+      currency: "BRL",
+    });
+    expect(expenseSettlement.ok).toBe(true);
   });
 });
 
