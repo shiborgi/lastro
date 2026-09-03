@@ -6,17 +6,30 @@
   "main": "./src/index.ts",
   "types": "./src/index.ts",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./tokens": "./src/tokens.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
     "lint": "biome check .",
-    "test": "echo \"no unit tests in foundation yet\"",
+    "test": "bun test --preload ./src/__tests__/setup.ts",
+    "test:a11y": "bun test --preload ./src/__tests__/setup.ts src/__tests__/a11y.test.tsx",
     "build": "mkdir -p dist && echo \"stub build for ui\" > dist/index.js",
     "check": "bun run typecheck && bun run lint && bun run test && bun run build"
   },
+  "dependencies": {
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0"
+  },
   "devDependencies": {
-    "typescript": "^5.6.3",
-    "@types/node": "^22.7.4"
+    "@testing-library/dom": "^10.4.1",
+    "@testing-library/react": "^16.3.3",
+    "@types/jsdom": "^30.0.0",
+    "@types/node": "^22.7.4",
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "axe-core": "^4.13.0",
+    "jsdom": "^30.0.1",
+    "typescript": "^5.6.3"
   }
 }
