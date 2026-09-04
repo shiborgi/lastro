@@ -13,6 +13,18 @@ services:
       timeout: 2s
       retries: 10
 
+  migrate:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: ["bun", "packages/db/src/migrate.ts"]
+    environment:
+      DATABASE_URL: postgres://lastro:${LASTRO_DB_PASSWORD:-lastro}@postgres:5432/lastro
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
   api:
     build:
       context: .
@@ -20,10 +32,11 @@ services:
     command: ["bun", "apps/api/src/index.ts"]
     environment:
       DATABASE_URL: postgres://lastro:${LASTRO_DB_PASSWORD:-lastro}@postgres:5432/lastro
+      HOST: 0.0.0.0
       PORT: "3001"
     depends_on:
-      postgres:
-        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     ports:
       - "3001:3001"
 
@@ -34,10 +47,11 @@ services:
     command: ["bun", "apps/mcp/src/index.ts"]
     environment:
       DATABASE_URL: postgres://lastro:${LASTRO_DB_PASSWORD:-lastro}@postgres:5432/lastro
+      HOST: 0.0.0.0
       PORT: "3002"
     depends_on:
-      postgres:
-        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     ports:
       - "3002:3002"
 
@@ -45,12 +59,27 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    command: ["bun", "apps/worker/src/index.ts"]
+    command: ["bun", "apps/worker/src/run.ts"]
     environment:
       DATABASE_URL: postgres://lastro:${LASTRO_DB_PASSWORD:-lastro}@postgres:5432/lastro
     depends_on:
-      postgres:
-        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    working_dir: /app/apps/web
+    command: ["bun", "run", "start"]
+    environment:
+      LASTRO_API_URL: ${LASTRO_API_URL:-http://api:3001}
+      LASTRO_API_TOKEN: ${LASTRO_API_TOKEN:-}
+    depends_on:
+      api:
+        condition: service_started
+    ports:
+      - "3000:3000"
 
 volumes:
   lastro_pgdata:

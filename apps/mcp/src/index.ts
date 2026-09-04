@@ -19,7 +19,7 @@ export const server =
     ? undefined
     : Bun.serve({
         port,
-        hostname: "127.0.0.1",
+        hostname: process.env.HOST ?? "127.0.0.1",
         fetch: createMcp(options).fetch,
       });
 

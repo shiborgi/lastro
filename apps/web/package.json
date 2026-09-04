@@ -9,6 +9,7 @@
     "test": "bun test --preload ./src/__tests__/setup.ts src/__tests__",
     "test:e2e": "playwright test",
     "build": "next build --webpack",
+    "start": "next start",
     "dev": "next dev",
     "check": "bun run typecheck && bun run lint && bun run test && bun run build"
   },

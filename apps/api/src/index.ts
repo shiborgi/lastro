@@ -16,6 +16,6 @@ const port = Number(process.env.PORT ?? "3001");
 
 export const server = Bun.serve({
   port,
-  hostname: "127.0.0.1",
+  hostname: process.env.HOST ?? "127.0.0.1",
   fetch: app.fetch,
 });
