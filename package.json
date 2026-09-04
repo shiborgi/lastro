@@ -19,6 +19,8 @@
     "check:secrets": "bun scripts/check-secrets.ts",
     "backup": "bun scripts/backup-restore.ts backup",
     "restore": "bun scripts/backup-restore.ts restore",
+    "apple-container": "bun scripts/apple-container.ts",
+    "seed:demo": "bun scripts/seed-demo.ts",
     "release:gate": "bun scripts/release-gate.ts"
   },
   "devDependencies": {

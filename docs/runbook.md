@@ -9,6 +9,8 @@ procedures for Lastro. It is the operational companion to
 - A clean machine with Docker and Docker Compose installed.
 - The `LASTRO_DB_PASSWORD` secret provided via the environment (never committed).
 - The `LASTRO_MCP_BEARER_TOKEN` secret for the MCP service (never committed).
+- The `LASTRO_API_TOKEN` session credential for the web dashboard's API calls
+  (never committed).
 
 ## Release compose
 
@@ -19,12 +21,16 @@ dependency:
 docker compose -f docker-compose.release.yml up -d --build
 ```
 
-Health is reported by each service's `/health` endpoint; PostgreSQL is gated by
-its own healthcheck. The API listens on `3001` and MCP on `3002`.
+The one-shot `migrate` service applies the Drizzle schema after PostgreSQL is
+healthy; `api`, `mcp`, and `worker` start only after migration completes, and
+`web` starts once `api` is up. Health is reported by each service's `/health`
+endpoint; PostgreSQL is gated by its own healthcheck. The API listens on
+`3001`, MCP on `3002`, and the web dashboard on `3000`.
 
 ## Backup and restore
 
-Backup a populated Book:
+Backup a populated Book (the dump runs inside the `postgres` container, so no
+host Postgres toolchain is required):
 
 ```bash
 bun run backup
