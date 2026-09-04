@@ -1,0 +1,56 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: lastro
+      POSTGRES_PASSWORD: ${LASTRO_DB_PASSWORD:-lastro}
+      POSTGRES_DB: lastro
+    volumes:
+      - lastro_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U lastro -d lastro"]
+      interval: 2s
+      timeout: 2s
+      retries: 10
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: ["bun", "apps/api/src/index.ts"]
+    environment:
+      DATABASE_URL: postgres://lastro:${LASTRO_DB_PASSWORD:-lastro}@postgres:5432/lastro
+      PORT: "3001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "3001:3001"
+
+  mcp:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: ["bun", "apps/mcp/src/index.ts"]
+    environment:
+      DATABASE_URL: postgres://lastro:${LASTRO_DB_PASSWORD:-lastro}@postgres:5432/lastro
+      PORT: "3002"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "3002:3002"
+
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: ["bun", "apps/worker/src/index.ts"]
+    environment:
+      DATABASE_URL: postgres://lastro:${LASTRO_DB_PASSWORD:-lastro}@postgres:5432/lastro
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  lastro_pgdata:

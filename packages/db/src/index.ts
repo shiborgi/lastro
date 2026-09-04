@@ -183,6 +183,42 @@ function transferFromRow(row: typeof schema.transfers.$inferSelect): Transfer {
   };
 }
 
+function importedMovementFromRow(
+  row: typeof schema.importedMovements.$inferSelect,
+) {
+  return {
+    id: String(row.id),
+    bookId: String(row.bookId),
+    provider: row.provider,
+    providerAccountId: row.providerAccountId,
+    externalReference: row.externalReference,
+    kind: row.kind as "DEBIT" | "CREDIT",
+    amountMinor: row.amountMinor,
+    currency: row.currency,
+    occurredAt: row.occurredAt,
+    status: row.status as "REVIEW" | "CONVERTED" | "UNCHANGED",
+    createdAt: row.createdAt,
+  };
+}
+
+function jobFromRow(row: typeof schema.jobs.$inferSelect) {
+  return {
+    id: String(row.id),
+    bookId: String(row.bookId),
+    type: row.type,
+    payload: row.payload,
+    status: row.status as "PENDING" | "RUNNING" | "SUCCEEDED" | "FAILED",
+    attempts: row.attempts,
+    maxAttempts: row.maxAttempts,
+    nextRunAt: row.nextRunAt,
+    leasedBy: row.leasedBy,
+    leasedUntil: row.leasedUntil,
+    lastError: row.lastError,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+  };
+}
+
 function auditValues(audit: AuditEvent, resourceId?: string) {
   return {
     actorType: audit.actorType,
@@ -1172,6 +1208,212 @@ export function createRepositories(db: Database) {
         .from(schema.transfers)
         .where(eq(schema.transfers.correlationId, correlationId));
       return row ? transferFromRow(row) : null;
+    },
+
+    async upsertImportedMovement(input: {
+      bookId: string;
+      provider: string;
+      providerAccountId: string;
+      externalReference: string;
+      kind: "DEBIT" | "CREDIT";
+      amountMinor: bigint;
+      currency: string;
+      occurredAt: Date;
+    }) {
+      return db.transaction(async (tx) => {
+        const bookId = bookNumber(input.bookId);
+        const [existing] = await tx
+          .select()
+          .from(schema.importedMovements)
+          .where(
+            and(
+              eq(schema.importedMovements.bookId, bookId),
+              eq(schema.importedMovements.provider, input.provider),
+              eq(
+                schema.importedMovements.externalReference,
+                input.externalReference,
+              ),
+            ),
+          );
+        if (existing) {
+          const [updated] = await tx
+            .update(schema.importedMovements)
+            .set({ status: "UNCHANGED" })
+            .where(eq(schema.importedMovements.id, existing.id))
+            .returning();
+          return {
+            movement: importedMovementFromRow(updated),
+            unchanged: true,
+          };
+        }
+        const [row] = await tx
+          .insert(schema.importedMovements)
+          .values({
+            bookId,
+            provider: input.provider,
+            providerAccountId: input.providerAccountId,
+            externalReference: input.externalReference,
+            kind: input.kind,
+            amountMinor: input.amountMinor,
+            currency: input.currency,
+            occurredAt: input.occurredAt,
+            status: "REVIEW",
+          })
+          .returning();
+        return { movement: importedMovementFromRow(row), unchanged: false };
+      });
+    },
+
+    async listImportedMovements(bookId: string) {
+      const rows = await db
+        .select()
+        .from(schema.importedMovements)
+        .where(eq(schema.importedMovements.bookId, bookNumber(bookId)));
+      return rows.map(importedMovementFromRow);
+    },
+
+    async markImportedMovementConverted(
+      bookId: string,
+      id: string,
+      audit: AuditEvent,
+    ) {
+      return db.transaction(async (tx) => {
+        const [row] = await tx
+          .update(schema.importedMovements)
+          .set({ status: "CONVERTED" })
+          .where(
+            and(
+              eq(schema.importedMovements.bookId, bookNumber(bookId)),
+              eq(schema.importedMovements.id, Number(id)),
+            ),
+          )
+          .returning();
+        if (!row) throw new Error("imported movement was not found");
+        await tx
+          .insert(schema.auditEvents)
+          .values(auditValues(audit, String(row.id)));
+        return importedMovementFromRow(row);
+      });
+    },
+
+    async createJob(input: {
+      bookId: string;
+      type: string;
+      payload: Record<string, unknown>;
+      nextRunAt: Date;
+      maxAttempts?: number;
+    }) {
+      const [row] = await db
+        .insert(schema.jobs)
+        .values({
+          bookId: bookNumber(input.bookId),
+          type: input.type,
+          payload: input.payload,
+          nextRunAt: input.nextRunAt,
+          maxAttempts: input.maxAttempts ?? 3,
+        })
+        .returning();
+      return jobFromRow(row);
+    },
+
+    async claimDueJob(workerId: string, now: Date) {
+      const nowIso = now.toISOString();
+      return db.transaction(async (tx) => {
+        const [row] = await tx
+          .select()
+          .from(schema.jobs)
+          .where(
+            and(
+              eq(schema.jobs.status, "PENDING"),
+              sql`${schema.jobs.nextRunAt} <= ${nowIso}::timestamptz`,
+              sql`(${schema.jobs.leasedUntil} is null or ${schema.jobs.leasedUntil} < ${nowIso}::timestamptz)`,
+            ),
+          )
+          .limit(1)
+          .for("update", { skipLocked: true });
+        if (!row) return null;
+        const [claimed] = await tx
+          .update(schema.jobs)
+          .set({
+            status: "RUNNING",
+            leasedBy: workerId,
+            leasedUntil: new Date(now.getTime() + 60_000),
+            attempts: row.attempts + 1,
+          })
+          .where(eq(schema.jobs.id, row.id))
+          .returning();
+        return jobFromRow(claimed);
+      });
+    },
+
+    async completeJob(id: string, bookId: string) {
+      const [row] = await db
+        .update(schema.jobs)
+        .set({ status: "SUCCEEDED", leasedBy: null, leasedUntil: null })
+        .where(
+          and(
+            eq(schema.jobs.id, Number(id)),
+            eq(schema.jobs.bookId, bookNumber(bookId)),
+          ),
+        )
+        .returning();
+      return row ? jobFromRow(row) : null;
+    },
+
+    async failJob(
+      id: string,
+      bookId: string,
+      error: string,
+      nextRunAt: Date,
+      maxAttempts: number,
+    ) {
+      return db.transaction(async (tx) => {
+        const [row] = await tx
+          .select()
+          .from(schema.jobs)
+          .where(
+            and(
+              eq(schema.jobs.id, Number(id)),
+              eq(schema.jobs.bookId, bookNumber(bookId)),
+            ),
+          );
+        if (!row) return null;
+        const failed = row.attempts >= maxAttempts;
+        const [updated] = await tx
+          .update(schema.jobs)
+          .set({
+            status: failed ? "FAILED" : "PENDING",
+            leasedBy: null,
+            leasedUntil: null,
+            lastError: error,
+            nextRunAt: failed ? row.nextRunAt : nextRunAt,
+          })
+          .where(eq(schema.jobs.id, row.id))
+          .returning();
+        return jobFromRow(updated);
+      });
+    },
+
+    async releaseJobLease(id: string, bookId: string) {
+      const [row] = await db
+        .update(schema.jobs)
+        .set({ status: "PENDING", leasedBy: null, leasedUntil: null })
+        .where(
+          and(
+            eq(schema.jobs.id, Number(id)),
+            eq(schema.jobs.bookId, bookNumber(bookId)),
+          ),
+        )
+        .returning();
+      return row ? jobFromRow(row) : null;
+    },
+
+    async listJobs(bookId: string) {
+      const rows = await db
+        .select()
+        .from(schema.jobs)
+        .where(eq(schema.jobs.bookId, bookNumber(bookId)));
+      return rows.map(jobFromRow);
     },
 
     auth: createAuthStore(db),

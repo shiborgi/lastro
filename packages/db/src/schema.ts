@@ -10,6 +10,7 @@ import {
   serial,
   text,
   timestamp,
+  uniqueIndex,
 } from "drizzle-orm/pg-core";
 
 export const users = pgTable("users", {
@@ -523,6 +524,89 @@ export const sessions = pgTable(
       columns: [table.userId],
       foreignColumns: [users.id],
     }),
+  }),
+);
+
+export const importedMovements = pgTable(
+  "imported_movements",
+  {
+    id: serial("id").notNull(),
+    bookId: integer("book_id").notNull(),
+    provider: text("provider").notNull(),
+    providerAccountId: text("provider_account_id").notNull(),
+    externalReference: text("external_reference").notNull(),
+    kind: text("kind").notNull(),
+    amountMinor: bigint("amount_minor", { mode: "bigint" }).notNull(),
+    currency: text("currency").notNull(),
+    occurredAt: timestamp("occurred_at").notNull(),
+    status: text("status").notNull().default("REVIEW"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => ({
+    primaryKey: primaryKey({
+      name: "imported_movements_book_id_id_pk",
+      columns: [table.bookId, table.id],
+    }),
+    bookForeignKey: foreignKey({
+      name: "imported_movements_book_id_books_id_fk",
+      columns: [table.bookId],
+      foreignColumns: [books.id],
+    }),
+    uniqueReference: uniqueIndex("imported_movements_book_provider_ref_uk").on(
+      table.bookId,
+      table.provider,
+      table.externalReference,
+    ),
+    kindCheck: check(
+      "imported_movements_kind_check",
+      sql`${table.kind} in ('DEBIT', 'CREDIT')`,
+    ),
+    statusCheck: check(
+      "imported_movements_status_check",
+      sql`${table.status} in ('REVIEW', 'CONVERTED', 'UNCHANGED')`,
+    ),
+    amountCheck: check(
+      "imported_movements_amount_minor_positive",
+      sql`${table.amountMinor} > 0`,
+    ),
+    currencyCheck: check(
+      "imported_movements_currency_check",
+      sql`${table.currency} ~ '^[A-Z]{3}$'`,
+    ),
+  }),
+);
+
+export const jobs = pgTable(
+  "jobs",
+  {
+    id: serial("id").notNull(),
+    bookId: integer("book_id").notNull(),
+    type: text("type").notNull(),
+    payload: jsonb("payload").$type<Record<string, unknown>>().notNull(),
+    status: text("status").notNull().default("PENDING"),
+    attempts: integer("attempts").notNull().default(0),
+    maxAttempts: integer("max_attempts").notNull().default(3),
+    nextRunAt: timestamp("next_run_at").notNull(),
+    leasedBy: text("leased_by"),
+    leasedUntil: timestamp("leased_until"),
+    lastError: text("last_error"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => ({
+    primaryKey: primaryKey({
+      name: "jobs_book_id_id_pk",
+      columns: [table.bookId, table.id],
+    }),
+    bookForeignKey: foreignKey({
+      name: "jobs_book_id_books_id_fk",
+      columns: [table.bookId],
+      foreignColumns: [books.id],
+    }),
+    statusCheck: check(
+      "jobs_status_check",
+      sql`${table.status} in ('PENDING', 'RUNNING', 'SUCCEEDED', 'FAILED')`,
+    ),
   }),
 );
 

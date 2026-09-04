@@ -29,6 +29,13 @@
       "when": 1788600000000,
       "tag": "0003_wave_16_revenue_cycle",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1788700000000,
+      "tag": "0004_wave_18_imports_jobs",
+      "breakpoints": true
     }
   ]
 }

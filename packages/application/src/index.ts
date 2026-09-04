@@ -604,7 +604,7 @@ export function createApplication(repository: ApplicationRepository) {
         auditFor(context, "payment.created", "payment", {
           accountId: input.accountId,
           partyId: input.partyId,
-          amountMinor: input.amountMinor,
+          amountMinor: input.amountMinor.toString(),
           currency: input.currency,
         }),
       );
@@ -646,7 +646,7 @@ export function createApplication(repository: ApplicationRepository) {
         auditFor(context, "expense_settlement.created", "expense_settlement", {
           expenseId: input.expenseId,
           paymentId: input.paymentId,
-          amountMinor: input.amountMinor,
+          amountMinor: input.amountMinor.toString(),
           currency: input.currency,
         }),
       );
@@ -876,7 +876,7 @@ export function createApplication(repository: ApplicationRepository) {
         auditFor(context, "receipt.created", "receipt", {
           accountId: input.accountId,
           partyId: input.partyId,
-          amountMinor: input.amountMinor,
+          amountMinor: input.amountMinor.toString(),
           currency: input.currency,
         }),
       );
@@ -918,7 +918,7 @@ export function createApplication(repository: ApplicationRepository) {
         auditFor(context, "revenue_settlement.created", "revenue_settlement", {
           revenueId: input.revenueId,
           receiptId: input.receiptId,
-          amountMinor: input.amountMinor,
+          amountMinor: input.amountMinor.toString(),
           currency: input.currency,
         }),
       );
@@ -1110,7 +1110,7 @@ export function createApplication(repository: ApplicationRepository) {
         auditFor(context, "transfer.created", "transfer", {
           sourceAccountId: input.sourceAccountId,
           destinationAccountId: input.destinationAccountId,
-          amountMinor: input.amountMinor,
+          amountMinor: input.amountMinor.toString(),
           currency: input.currency,
         }),
       );

@@ -16,7 +16,10 @@
     "db:migrate": "turbo run migrate --filter=@lastro/db",
     "dev": "turbo run dev",
     "check:notices": "bun scripts/check-notices.ts",
-    "check:secrets": "bun scripts/check-secrets.ts"
+    "check:secrets": "bun scripts/check-secrets.ts",
+    "backup": "bun scripts/backup-restore.ts backup",
+    "restore": "bun scripts/backup-restore.ts restore",
+    "release:gate": "bun scripts/release-gate.ts"
   },
   "devDependencies": {
     "@biomejs/biome": "^1.9.4",
