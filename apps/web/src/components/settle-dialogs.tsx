@@ -1,7 +1,7 @@
 "use client";
 
-import { Button, Dialog } from "@lastro/ui";
-import { useRef, useState } from "react";
+import { Button, Dialog, Field } from "@lastro/ui";
+import { useId, useRef, useState } from "react";
 import type { ApiClient, FinancialResource } from "../lib/api";
 
 export function SettleDialog({
@@ -24,6 +24,7 @@ export function SettleDialog({
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const firstField = useRef<HTMLSelectElement>(null);
+  const uid = useId();
 
   async function submit() {
     setError(null);
@@ -67,10 +68,10 @@ export function SettleDialog({
         }}
         style={{ display: "grid", gap: "0.75rem" }}
       >
-        <label style={{ display: "grid", gap: "0.25rem" }}>
-          <span style={{ fontSize: "0.75rem", fontWeight: 700 }}>Payment</span>
+        <Field label="Payment" htmlFor={`${uid}-payment-id`}>
           <select
             ref={firstField}
+            id={`${uid}-payment-id`}
             aria-label="Payment"
             value={paymentId}
             onChange={(event) => setPaymentId(event.target.value)}
@@ -83,21 +84,21 @@ export function SettleDialog({
               </option>
             ))}
           </select>
-        </label>
-        <label style={{ display: "grid", gap: "0.25rem" }}>
-          <span style={{ fontSize: "0.75rem", fontWeight: 700 }}>
-            Amount (minor units)
-          </span>
+        </Field>
+        <Field label="Amount (minor units)" htmlFor={`${uid}-amount-minor`}>
           <input
+            id={`${uid}-amount-minor`}
             aria-label="Amount (minor units)"
             value={amountMinor}
             onChange={(event) => setAmountMinor(event.target.value)}
             inputMode="numeric"
             required
           />
-        </label>
+        </Field>
         {error ? (
-          <p style={{ color: "var(--lastro-danger)", margin: 0 }}>{error}</p>
+          <p role="alert" style={{ color: "var(--lastro-danger)", margin: 0 }}>
+            {error}
+          </p>
         ) : null}
       </form>
     </Dialog>
@@ -121,6 +122,7 @@ export function VoidDialog({
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const firstField = useRef<HTMLInputElement>(null);
+  const uid = useId();
 
   async function confirm() {
     setError(null);
@@ -158,18 +160,19 @@ export function VoidDialog({
         This will void settlement <strong>{target.settlementId}</strong>.
         Impact: {target.impact}. This action cannot be undone.
       </p>
-      <label style={{ display: "grid", gap: "0.25rem" }}>
-        <span style={{ fontSize: "0.75rem", fontWeight: 700 }}>
-          Reason (optional)
-        </span>
+      <Field label="Reason (optional)" htmlFor={`${uid}-void-reason`}>
         <input
           ref={firstField}
+          id={`${uid}-void-reason`}
+          aria-label="Reason (optional)"
           value={voidReason}
           onChange={(event) => setVoidReason(event.target.value)}
         />
-      </label>
+      </Field>
       {error ? (
-        <p style={{ color: "var(--lastro-danger)", margin: 0 }}>{error}</p>
+        <p role="alert" style={{ color: "var(--lastro-danger)", margin: 0 }}>
+          {error}
+        </p>
       ) : null}
     </Dialog>
   );

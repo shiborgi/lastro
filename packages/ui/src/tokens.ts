@@ -14,6 +14,7 @@ export const tones = {
     success: "#2e7d32",
     warning: "#b26a00",
     info: "#2563eb",
+    overlay: "rgba(0, 0, 0, 0.5)",
   },
   dark: {
     name: "dark",
@@ -30,6 +31,7 @@ export const tones = {
     success: "#7ed491",
     warning: "#e0a83e",
     info: "#6ea8ff",
+    overlay: "rgba(0, 0, 0, 0.6)",
   },
 } as const;
 
@@ -62,5 +64,5 @@ export const fontFamilySans =
 
 export function themeVariables(theme: ThemeName): string {
   const tone = tones[theme];
-  return `--lastro-background: ${tone.background};--lastro-surface: ${tone.surface};--lastro-surface-muted: ${tone.surfaceMuted};--lastro-border: ${tone.border};--lastro-text: ${tone.text};--lastro-text-muted: ${tone.textMuted};--lastro-primary: ${tone.primary};--lastro-primary-foreground: ${tone.primaryForeground};--lastro-focus: ${tone.focus};--lastro-danger: ${tone.danger};--lastro-success: ${tone.success};--lastro-warning: ${tone.warning};--lastro-info: ${tone.info};`;
+  return `--lastro-background: ${tone.background};--lastro-surface: ${tone.surface};--lastro-surface-muted: ${tone.surfaceMuted};--lastro-border: ${tone.border};--lastro-text: ${tone.text};--lastro-text-muted: ${tone.textMuted};--lastro-primary: ${tone.primary};--lastro-primary-foreground: ${tone.primaryForeground};--lastro-focus: ${tone.focus};--lastro-danger: ${tone.danger};--lastro-success: ${tone.success};--lastro-warning: ${tone.warning};--lastro-info: ${tone.info};--lastro-overlay: ${tone.overlay};`;
 }

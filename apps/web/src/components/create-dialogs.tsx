@@ -1,7 +1,7 @@
 "use client";
 
-import { Button, Dialog } from "@lastro/ui";
-import { useRef, useState } from "react";
+import { Button, Dialog, Field } from "@lastro/ui";
+import { useId, useRef, useState } from "react";
 import type { ApiClient } from "../lib/api";
 
 export function CreateExpenseDialog({
@@ -23,6 +23,7 @@ export function CreateExpenseDialog({
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const firstField = useRef<HTMLInputElement>(null);
+  const uid = useId();
 
   async function submit() {
     setError(null);
@@ -67,33 +68,40 @@ export function CreateExpenseDialog({
         }}
         style={{ display: "grid", gap: "0.75rem" }}
       >
-        <Field label="Account id">
+        <Field label="Account id" htmlFor={`${uid}-account-id`}>
           <input
             ref={firstField}
+            id={`${uid}-account-id`}
             aria-label="Account id"
             value={accountId}
             onChange={(event) => setAccountId(event.target.value)}
             required
           />
         </Field>
-        <Field label="Party id">
+        <Field label="Party id" htmlFor={`${uid}-party-id`}>
           <input
+            id={`${uid}-party-id`}
             aria-label="Party id"
             value={partyId}
             onChange={(event) => setPartyId(event.target.value)}
             required
           />
         </Field>
-        <Field label="Expense category id">
+        <Field
+          label="Expense category id"
+          htmlFor={`${uid}-expense-category-id`}
+        >
           <input
+            id={`${uid}-expense-category-id`}
             aria-label="Expense category id"
             value={expenseCategoryId}
             onChange={(event) => setExpenseCategoryId(event.target.value)}
             required
           />
         </Field>
-        <Field label="Amount (minor units)">
+        <Field label="Amount (minor units)" htmlFor={`${uid}-amount-minor`}>
           <input
+            id={`${uid}-amount-minor`}
             aria-label="Amount (minor units)"
             value={amountMinor}
             onChange={(event) => setAmountMinor(event.target.value)}
@@ -101,8 +109,9 @@ export function CreateExpenseDialog({
             required
           />
         </Field>
-        <Field label="Currency">
+        <Field label="Currency" htmlFor={`${uid}-currency`}>
           <input
+            id={`${uid}-currency`}
             aria-label="Currency"
             value={currency}
             onChange={(event) => setCurrency(event.target.value.toUpperCase())}
@@ -111,7 +120,9 @@ export function CreateExpenseDialog({
           />
         </Field>
         {error ? (
-          <p style={{ color: "var(--lastro-danger)", margin: 0 }}>{error}</p>
+          <p role="alert" style={{ color: "var(--lastro-danger)", margin: 0 }}>
+            {error}
+          </p>
         ) : null}
       </form>
     </Dialog>
@@ -135,6 +146,7 @@ export function CreatePaymentDialog({
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const firstField = useRef<HTMLInputElement>(null);
+  const uid = useId();
 
   async function submit() {
     setError(null);
@@ -177,17 +189,19 @@ export function CreatePaymentDialog({
         }}
         style={{ display: "grid", gap: "0.75rem" }}
       >
-        <Field label="Account id">
+        <Field label="Account id" htmlFor={`${uid}-account-id`}>
           <input
             ref={firstField}
+            id={`${uid}-account-id`}
             aria-label="Account id"
             value={accountId}
             onChange={(event) => setAccountId(event.target.value)}
             required
           />
         </Field>
-        <Field label="Amount (minor units)">
+        <Field label="Amount (minor units)" htmlFor={`${uid}-amount-minor`}>
           <input
+            id={`${uid}-amount-minor`}
             aria-label="Amount (minor units)"
             value={amountMinor}
             onChange={(event) => setAmountMinor(event.target.value)}
@@ -195,8 +209,9 @@ export function CreatePaymentDialog({
             required
           />
         </Field>
-        <Field label="Currency">
+        <Field label="Currency" htmlFor={`${uid}-currency`}>
           <input
+            id={`${uid}-currency`}
             aria-label="Currency"
             value={currency}
             onChange={(event) => setCurrency(event.target.value.toUpperCase())}
@@ -205,21 +220,11 @@ export function CreatePaymentDialog({
           />
         </Field>
         {error ? (
-          <p style={{ color: "var(--lastro-danger)", margin: 0 }}>{error}</p>
+          <p role="alert" style={{ color: "var(--lastro-danger)", margin: 0 }}>
+            {error}
+          </p>
         ) : null}
       </form>
     </Dialog>
-  );
-}
-
-function Field({
-  label,
-  children,
-}: { label: string; children: React.ReactNode }) {
-  return (
-    <div style={{ display: "grid", gap: "0.25rem" }}>
-      <span style={{ fontSize: "0.75rem", fontWeight: 700 }}>{label}</span>
-      {children}
-    </div>
   );
 }

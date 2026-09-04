@@ -126,6 +126,33 @@
           "relations"
         ],
         "maxOutputBytes": 12800
+      },
+      "ui-surface": {
+        "facets": [
+          "symbols",
+          "relations",
+          "source",
+          "tests"
+        ],
+        "maxOutputBytes": 19200
+      },
+      "ui-tokens": {
+        "facets": [
+          "structure",
+          "symbols",
+          "source"
+        ],
+        "maxOutputBytes": 12800,
+        "sourceDepth": "signatures"
+      },
+      "ui-flow": {
+        "facets": [
+          "structure",
+          "relations",
+          "source",
+          "tests"
+        ],
+        "maxOutputBytes": 19200
       }
     },
     "defaults": {

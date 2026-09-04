@@ -49,7 +49,7 @@ export function Dialog({
   const overlayStyle: CSSProperties = {
     position: "fixed",
     inset: 0,
-    background: "rgba(0,0,0,0.5)",
+    background: "var(--lastro-overlay)",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
