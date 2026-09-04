@@ -53,6 +53,11 @@ describe("MCP v2 read-only tools", () => {
 
     const tools = await client.listTools();
     expect(tools.tools.map((tool) => tool.name).sort()).toEqual([
+      "create_expense",
+      "create_payment",
+      "create_receipt",
+      "create_revenue",
+      "create_transfer",
       "get_book_position",
       "get_cash_flow",
       "get_revenue_position",
@@ -63,8 +68,15 @@ describe("MCP v2 read-only tools", () => {
       "list_receipts",
       "list_revenue_settlements",
       "list_revenues",
+      "settle_expense_with_payment",
+      "settle_revenue_with_receipt",
+      "void_expense_settlement",
+      "void_revenue_settlement",
     ]);
-    expect(tools.tools.every((tool) => tool.annotations?.readOnlyHint)).toBe(
+    const readTools = tools.tools.filter(
+      (tool) => tool.name.startsWith("list_") || tool.name.startsWith("get_"),
+    );
+    expect(readTools.every((tool) => tool.annotations?.readOnlyHint)).toBe(
       true,
     );
     const response = await client.callTool({

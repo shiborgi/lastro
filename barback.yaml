@@ -1,0 +1,88 @@
+# Lastro Barback integration contract
+#
+# This file is the deny-by-default Barback registration contract for the Lastro
+# Streamable HTTP MCP server. It is consumed by the Barback gateway (external)
+# and validated by the Lastro test suite. Lastro domain code never depends on
+# Barback; this contract is a configuration artifact only.
+#
+# The bearer credential is provided at runtime via the environment variable
+# LASTRO_MCP_BEARER_TOKEN and must never be committed. See scripts/check-secrets.ts.
+
+mcp:
+  endpoint: /mcp
+  protocol:
+    primary: "2026-07-28"
+    compatibility: ["2025-11-25", "2025-03-26"]
+  servers:
+    - id: lastro
+      transport: streamable-http
+      url: env:LASTRO_MCP_URL
+      required: true
+      auth:
+        bearerToken: env:LASTRO_MCP_BEARER_TOKEN
+      tools:
+        default: deny
+        allow:
+          # read tools
+          - list_books
+          - list_expenses
+          - list_payments
+          - list_expense_settlements
+          - get_book_position
+          - list_revenues
+          - list_receipts
+          - list_revenue_settlements
+          - get_revenue_position
+          - get_cash_flow
+          # write tools
+          - create_expense
+          - create_payment
+          - settle_expense_with_payment
+          - create_revenue
+          - create_receipt
+          - settle_revenue_with_receipt
+          - create_transfer
+          - void_expense_settlement
+          - void_revenue_settlement
+        policies:
+          list_books: { effect: read }
+          list_expenses: { effect: read }
+          list_payments: { effect: read }
+          list_expense_settlements: { effect: read }
+          get_book_position: { effect: read }
+          list_revenues: { effect: read }
+          list_receipts: { effect: read }
+          list_revenue_settlements: { effect: read }
+          get_revenue_position: { effect: read }
+          get_cash_flow: { effect: read }
+          create_expense: { effect: write }
+          create_payment: { effect: write }
+          settle_expense_with_payment: { effect: write }
+          create_revenue: { effect: write }
+          create_receipt: { effect: write }
+          settle_revenue_with_receipt: { effect: write }
+          create_transfer: { effect: write }
+          void_expense_settlement: { effect: write }
+          void_revenue_settlement: { effect: write }
+  toolsets:
+    lastro:
+      - lastro:list_books
+      - lastro:list_expenses
+      - lastro:list_payments
+      - lastro:list_expense_settlements
+      - lastro:get_book_position
+      - lastro:list_revenues
+      - lastro:list_receipts
+      - lastro:list_revenue_settlements
+      - lastro:get_revenue_position
+      - lastro:get_cash_flow
+      - lastro:create_expense
+      - lastro:create_payment
+      - lastro:settle_expense_with_payment
+      - lastro:create_revenue
+      - lastro:create_receipt
+      - lastro:settle_revenue_with_receipt
+      - lastro:create_transfer
+      - lastro:void_expense_settlement
+      - lastro:void_revenue_settlement
+  argumentLimit: 1mb

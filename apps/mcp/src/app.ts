@@ -2,11 +2,20 @@ import type { Application } from "@lastro/application";
 import { type AuthService, authenticateMcpRequest } from "@lastro/auth";
 import {
   BookPosition,
+  CreateExpense,
+  CreateExpenseSettlement,
+  CreatePayment,
+  CreateReceipt,
+  CreateRevenue,
+  CreateRevenueSettlement,
+  CreateTransfer,
   CursorPage,
   FinancialResource,
   Id,
   Page,
   RevenuePosition,
+  VoidExpenseSettlement,
+  VoidRevenueSettlement,
 } from "@lastro/contracts";
 import type { ExecutionContext } from "@lastro/domain";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
@@ -28,6 +37,31 @@ const toolPage = z
     limit: z.number().int().min(1).max(100).default(50),
   })
   .strict();
+
+const idempotencyKey = z.string().trim().min(1).max(200);
+
+const writeBase = z.object({
+  bookId: Id,
+  idempotencyKey,
+});
+
+const confirmation = z.literal("confirm");
+
+function writeResult(value: Record<string, unknown>) {
+  return result(value);
+}
+
+function confirmationRequired(action: string) {
+  return {
+    content: [
+      {
+        type: "text" as const,
+        text: `Confirmation required for ${action}. Re-run with confirmation: "confirm".`,
+      },
+    ],
+    structuredContent: { confirmationRequired: true, action },
+  };
+}
 
 function resource(value: Record<string, unknown>) {
   const {
@@ -391,6 +425,265 @@ export function createMcpServer(opts: McpOptions, context: ExecutionContext) {
             ...item,
             amountMinor: item.amountMinor.toString(),
           })),
+        });
+      } catch (cause) {
+        return error(cause instanceof Error ? cause.message : "request failed");
+      }
+    },
+  );
+
+  server.registerTool(
+    "create_expense",
+    {
+      description:
+        "Create an expense in an explicitly selected Book. Requires an idempotency key.",
+      inputSchema: writeBase.merge(CreateExpense),
+    },
+    async (input) => {
+      try {
+        requireBook(input.bookId);
+        const { bookId: _bookId, idempotencyKey, ...rest } = input;
+        const expense = await application.createExpense({
+          context: { ...context, idempotencyKey },
+          ...rest,
+          amountMinor: BigInt(rest.amountMinor),
+          occurredAt: rest.occurredAt ? new Date(rest.occurredAt) : undefined,
+        });
+        return writeResult({
+          expense: resource(expense as Record<string, unknown>),
+        });
+      } catch (cause) {
+        return error(cause instanceof Error ? cause.message : "request failed");
+      }
+    },
+  );
+
+  server.registerTool(
+    "create_payment",
+    {
+      description:
+        "Create a payment in an explicitly selected Book. Requires an idempotency key.",
+      inputSchema: writeBase.merge(CreatePayment),
+    },
+    async (input) => {
+      try {
+        requireBook(input.bookId);
+        const { bookId: _bookId, idempotencyKey, ...rest } = input;
+        const payment = await application.createPayment({
+          context: { ...context, idempotencyKey },
+          ...rest,
+          amountMinor: BigInt(rest.amountMinor),
+          occurredAt: rest.occurredAt ? new Date(rest.occurredAt) : undefined,
+        });
+        return writeResult({
+          payment: resource(payment as Record<string, unknown>),
+        });
+      } catch (cause) {
+        return error(cause instanceof Error ? cause.message : "request failed");
+      }
+    },
+  );
+
+  server.registerTool(
+    "settle_expense_with_payment",
+    {
+      description:
+        "Settle an expense with a payment in an explicitly selected Book. Requires an idempotency key.",
+      inputSchema: writeBase.merge(CreateExpenseSettlement),
+    },
+    async (input) => {
+      try {
+        requireBook(input.bookId);
+        const { bookId: _bookId, idempotencyKey, ...rest } = input;
+        const settlement = await application.createExpenseSettlement({
+          context: { ...context, idempotencyKey },
+          ...rest,
+          amountMinor: BigInt(rest.amountMinor),
+        });
+        return writeResult({
+          settlement: resource(settlement as Record<string, unknown>),
+        });
+      } catch (cause) {
+        return error(cause instanceof Error ? cause.message : "request failed");
+      }
+    },
+  );
+
+  server.registerTool(
+    "create_revenue",
+    {
+      description:
+        "Create a revenue in an explicitly selected Book. Requires an idempotency key.",
+      inputSchema: writeBase.merge(CreateRevenue),
+    },
+    async (input) => {
+      try {
+        requireBook(input.bookId);
+        const { bookId: _bookId, idempotencyKey, ...rest } = input;
+        const revenue = await application.createRevenue({
+          context: { ...context, idempotencyKey },
+          ...rest,
+          amountMinor: BigInt(rest.amountMinor),
+          occurredAt: rest.occurredAt ? new Date(rest.occurredAt) : undefined,
+        });
+        return writeResult({
+          revenue: resource(revenue as Record<string, unknown>),
+        });
+      } catch (cause) {
+        return error(cause instanceof Error ? cause.message : "request failed");
+      }
+    },
+  );
+
+  server.registerTool(
+    "create_receipt",
+    {
+      description:
+        "Create a receipt in an explicitly selected Book. Requires an idempotency key.",
+      inputSchema: writeBase.merge(CreateReceipt),
+    },
+    async (input) => {
+      try {
+        requireBook(input.bookId);
+        const { bookId: _bookId, idempotencyKey, ...rest } = input;
+        const receipt = await application.createReceipt({
+          context: { ...context, idempotencyKey },
+          ...rest,
+          amountMinor: BigInt(rest.amountMinor),
+          occurredAt: rest.occurredAt ? new Date(rest.occurredAt) : undefined,
+        });
+        return writeResult({
+          receipt: resource(receipt as Record<string, unknown>),
+        });
+      } catch (cause) {
+        return error(cause instanceof Error ? cause.message : "request failed");
+      }
+    },
+  );
+
+  server.registerTool(
+    "settle_revenue_with_receipt",
+    {
+      description:
+        "Settle a revenue with a receipt in an explicitly selected Book. Requires an idempotency key.",
+      inputSchema: writeBase.merge(CreateRevenueSettlement),
+    },
+    async (input) => {
+      try {
+        requireBook(input.bookId);
+        const { bookId: _bookId, idempotencyKey, ...rest } = input;
+        const settlement = await application.createRevenueSettlement({
+          context: { ...context, idempotencyKey },
+          ...rest,
+          amountMinor: BigInt(rest.amountMinor),
+        });
+        return writeResult({
+          settlement: resource(settlement as Record<string, unknown>),
+        });
+      } catch (cause) {
+        return error(cause instanceof Error ? cause.message : "request failed");
+      }
+    },
+  );
+
+  server.registerTool(
+    "create_transfer",
+    {
+      description:
+        "Create an internal transfer in an explicitly selected Book. Requires an idempotency key.",
+      inputSchema: writeBase.merge(CreateTransfer),
+    },
+    async (input) => {
+      try {
+        requireBook(input.bookId);
+        const { bookId: _bookId, idempotencyKey, ...rest } = input;
+        const transfer = await application.createTransfer({
+          context: { ...context, idempotencyKey },
+          ...rest,
+          amountMinor: BigInt(rest.amountMinor),
+        });
+        return writeResult({
+          transfer: {
+            id: String(transfer.id),
+            bookId: String(transfer.bookId),
+            sourcePaymentId: String(transfer.sourcePaymentId),
+            destinationReceiptId: String(transfer.destinationReceiptId),
+            correlationId: transfer.correlationId,
+            amountMinor: String(transfer.amountMinor),
+            currency: transfer.currency,
+          },
+        });
+      } catch (cause) {
+        return error(cause instanceof Error ? cause.message : "request failed");
+      }
+    },
+  );
+
+  server.registerTool(
+    "void_expense_settlement",
+    {
+      description:
+        "Void an expense settlement in an explicitly selected Book. Requires confirmation.",
+      inputSchema: writeBase
+        .merge(VoidExpenseSettlement)
+        .extend({ settlementId: Id, confirmation: confirmation.optional() }),
+    },
+    async (input) => {
+      try {
+        requireBook(input.bookId);
+        if (input.confirmation !== "confirm") {
+          return confirmationRequired("void_expense_settlement");
+        }
+        const {
+          bookId: _bookId,
+          idempotencyKey,
+          confirmation: _c,
+          settlementId,
+          ...rest
+        } = input;
+        const settlement = await application.voidExpenseSettlement({
+          context: { ...context, idempotencyKey },
+          id: settlementId,
+          ...rest,
+        });
+        return writeResult({
+          settlement: resource(settlement as Record<string, unknown>),
+        });
+      } catch (cause) {
+        return error(cause instanceof Error ? cause.message : "request failed");
+      }
+    },
+  );
+
+  server.registerTool(
+    "void_revenue_settlement",
+    {
+      description:
+        "Void a revenue settlement in an explicitly selected Book. Requires confirmation.",
+      inputSchema: writeBase
+        .merge(VoidRevenueSettlement)
+        .extend({ settlementId: Id, confirmation: confirmation.optional() }),
+    },
+    async (input) => {
+      try {
+        requireBook(input.bookId);
+        if (input.confirmation !== "confirm") {
+          return confirmationRequired("void_revenue_settlement");
+        }
+        const {
+          bookId: _bookId,
+          idempotencyKey,
+          confirmation: _c,
+          settlementId,
+          ...rest
+        } = input;
+        const settlement = await application.voidRevenueSettlement({
+          context: { ...context, idempotencyKey },
+          id: settlementId,
+          ...rest,
+        });
+        return writeResult({
+          settlement: resource(settlement as Record<string, unknown>),
         });
       } catch (cause) {
         return error(cause instanceof Error ? cause.message : "request failed");

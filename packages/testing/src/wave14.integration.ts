@@ -133,6 +133,11 @@ describe("WAVE-1.4 API and MCP read parity", () => {
       const tools = await client.listTools();
       const toolNames = tools.tools.map((tool) => tool.name).sort();
       expect(toolNames).toEqual([
+        "create_expense",
+        "create_payment",
+        "create_receipt",
+        "create_revenue",
+        "create_transfer",
         "get_book_position",
         "get_cash_flow",
         "get_revenue_position",
@@ -143,8 +148,15 @@ describe("WAVE-1.4 API and MCP read parity", () => {
         "list_receipts",
         "list_revenue_settlements",
         "list_revenues",
+        "settle_expense_with_payment",
+        "settle_revenue_with_receipt",
+        "void_expense_settlement",
+        "void_revenue_settlement",
       ]);
-      expect(tools.tools.every((tool) => tool.annotations?.readOnlyHint)).toBe(
+      const readTools = tools.tools.filter(
+        (tool) => tool.name.startsWith("list_") || tool.name.startsWith("get_"),
+      );
+      expect(readTools.every((tool) => tool.annotations?.readOnlyHint)).toBe(
         true,
       );
 
