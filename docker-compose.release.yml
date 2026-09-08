@@ -1,0 +1,80 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: lastro
+      POSTGRES_PASSWORD: ${LASTRO_DB_PASSWORD:-lastro}
+      POSTGRES_DB: lastro
+    volumes:
+      - lastro_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U lastro -d lastro"]
+      interval: 2s
+      timeout: 2s
+      retries: 10
+
+  db-init:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: ["bun", "packages/db/src/initialize.ts"]
+    environment:
+      DATABASE_URL: postgres://lastro:${LASTRO_DB_PASSWORD:-lastro}@postgres:5432/lastro
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: ["bun", "apps/api/src/index.ts"]
+    environment:
+      DATABASE_URL: postgres://lastro:${LASTRO_DB_PASSWORD:-lastro}@postgres:5432/lastro
+      HOST: 0.0.0.0
+      PORT: "3001"
+      # Required. The API refuses to start without at least 32 characters.
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?set BETTER_AUTH_SECRET in .env — openssl rand -base64 32}
+      BETTER_AUTH_URL: ${BETTER_AUTH_URL:-http://localhost:3001}
+      LASTRO_TRUSTED_ORIGINS: ${LASTRO_TRUSTED_ORIGINS:-}
+      LASTRO_ALLOW_SIGNUP: ${LASTRO_ALLOW_SIGNUP:-false}
+    depends_on:
+      db-init:
+        condition: service_completed_successfully
+    ports:
+      - "3001:3001"
+
+  mcp:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: ["bun", "apps/mcp/src/index.ts"]
+    environment:
+      DATABASE_URL: postgres://lastro:${LASTRO_DB_PASSWORD:-lastro}@postgres:5432/lastro
+      HOST: 0.0.0.0
+      PORT: "3002"
+    depends_on:
+      db-init:
+        condition: service_completed_successfully
+    ports:
+      - "3002:3002"
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    working_dir: /app/apps/web
+    command: ["bun", "run", "start"]
+    environment:
+      # The browser never holds a credential: the web app proxies to the API
+      # server-side and forwards the session cookie.
+      LASTRO_API_URL: ${LASTRO_API_URL:-http://api:3001}
+    depends_on:
+      api:
+        condition: service_started
+    ports:
+      - "3000:3000"
+
+volumes:
+  lastro_pgdata:

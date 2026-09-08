@@ -1,0 +1,29 @@
+{
+  "name": "@lastro/api",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "lint": "biome check .",
+    "test": "bun test",
+    "build": "bun build ./src/index.ts --outdir dist --target bun --packages=external --external '@lastro/*'",
+    "dev": "bun src/index.ts",
+    "check": "bun run typecheck && bun run lint && bun run test && bun run build"
+  },
+  "dependencies": {
+    "@lastro/application": "workspace:*",
+    "@lastro/auth": "workspace:*",
+    "@lastro/config": "workspace:*",
+    "@lastro/contracts": "workspace:*",
+    "@lastro/db": "workspace:*",
+    "@lastro/domain": "workspace:*",
+    "better-auth": "^1.7.3",
+    "hono": "^4.6.12",
+    "zod": "^4.5.4"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.3",
+    "@types/node": "^22.7.4"
+  }
+}
