@@ -1,0 +1,36 @@
+{
+  "name": "@lastro/host",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "lint": "biome check .",
+    "test": "bun test --pass-with-no-tests",
+    "build": "bun build ./src/index.ts --outdir dist --target bun --packages=external --external '@lastro/*'",
+    "check": "bun run typecheck && bun run lint && bun run test && bun run build",
+    "db:regenerate": "bun scripts/regenerate.ts",
+    "db:init": "bun src/initialize.ts"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.3",
+    "@types/node": "^22.7.4",
+    "drizzle-kit": "^0.31.10"
+  },
+  "dependencies": {
+    "@lastro/close": "workspace:*",
+    "@lastro/core": "workspace:*",
+    "@lastro/finance": "workspace:*",
+    "@lastro/kernel": "workspace:*",
+    "@lastro/sales": "workspace:*",
+    "@lastro/sales-imports": "workspace:*",
+    "@lastro/finance-imports": "workspace:*",
+    "drizzle-orm": "^0.45.2",
+    "postgres": "^3.4.4"
+  }
+}

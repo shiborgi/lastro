@@ -1,0 +1,3 @@
+-- core: invariants a CHECK cannot express.
+-- Appended to the generated init after the tables of every module (ADR 11).
+-- Core has none: its rules are keys and checks declared in schema.ts.

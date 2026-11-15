@@ -1,0 +1,5 @@
+Valor;Bandeira;Modalidade;Dígito da Conta;Número da Conta;Tipo de conta;Agência;Dígito Verificador da Agência;Identificador do Banco;Nome do Banco;Documento;StoneCode;Razão Social;Identificador Rastreável do Pagamento;Resposta do Banco;Origem da Conta;Data de Vencimento;Data de Pagamento;Status do Pagamento
+937,03;Maestro;Débito;9;12345678;Conta corrente;0001;;31872495;Banco C6 S.A.;00000000000100;000000000;EMPRESA EXEMPLO LTDA;202601070000000000001;00;Cadastro;07/01/2026;07/01/2026;Pago
+112,03;Mastercard;Crédito;9;12345678;Conta corrente;0001;;31872495;Banco C6 S.A.;00000000000100;000000000;EMPRESA EXEMPLO LTDA;202601070000000000002;00;Cadastro;07/01/2026;07/01/2026;Pago
+1.589,31;Visa;Crédito;9;12345678;Conta corrente;0001;;31872495;Banco C6 S.A.;00000000000100;000000000;EMPRESA EXEMPLO LTDA;202601090000000000004;00;Cadastro;09/01/2026;09/01/2026;Pago
+268,86;Visa;Crédito;9;12345678;Conta corrente;0001;;31872495;Banco C6 S.A.;00000000000100;000000000;EMPRESA EXEMPLO LTDA;202601080000000000003;01;Cadastro;08/01/2026;08/01/2026;PaymentScheduled

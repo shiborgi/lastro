@@ -1,0 +1,4 @@
+codigo,produto,categoria,quantidade,custo,faturamento,lucro_bruto,margem_pct,data_inicio,data_fim
+10931990,Cerveja Original Garrafa 600ml,Cerveja,86,679.40,1625.40,946.00,58.20,2026-11-01 06:00,2026-11-02 06:00
+10931982,Água Mineral Garrafa 510ml,Não Alcoólicos,40,52.00,200.00,148.00,74.00,2026-11-01 06:00,2026-11-02 06:00
+2714403,"Voucher 20,00",Couvert Artístico,34,0.00,680.00,680.00,100.00,2026-11-01 06:00,2026-11-02 06:00

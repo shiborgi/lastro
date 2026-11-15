@@ -1,0 +1,28 @@
+{
+  "$schema": "https://turbo.build/schema.json",
+  "tasks": {
+    "build": {
+      "dependsOn": ["^build"],
+      "outputs": ["dist/**"]
+    },
+    "@lastro/web#build": {
+      "outputs": [".next/**", "!.next/cache/**"],
+      "dependsOn": ["^build", "@lastro/web#typecheck"]
+    },
+    "typecheck": {
+      "dependsOn": ["^typecheck"]
+    },
+    "lint": {},
+    "test": {},
+    "test:integration": {
+      "cache": false
+    },
+    "check": {
+      "dependsOn": ["typecheck", "lint", "test", "build"]
+    },
+    "dev": {
+      "persistent": true,
+      "cache": false
+    }
+  }
+}

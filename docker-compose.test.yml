@@ -1,0 +1,22 @@
+# The integration suite's PostgreSQL. `packages/testing/src/integration.ts`
+# always runs it as its own compose project, `lastro-test`, on host port 55432,
+# and tears it down with `down -v` when the suite ends. It never shares a
+# project, a port or a volume with docker-compose.yml, so the suite cannot
+# migrate, write to or remove a database someone is using on 5432.
+name: lastro-test
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: lastro
+      POSTGRES_PASSWORD: lastro
+      POSTGRES_DB: lastro
+    ports:
+      - "55432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U lastro -d lastro"]
+      interval: 2s
+      timeout: 2s
+      retries: 10
+    tmpfs:
+      - /var/lib/postgresql/data
